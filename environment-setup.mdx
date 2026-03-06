@@ -99,14 +99,12 @@ The platform uses environment variables for configuration. These should never be
     Open `.env` and configure the following variables:
 
     ```bash .env
-    # Application Port
+    # Application Port (for development)
     PORT=3001
 
-    # Database Connection
-    DATABASE_URL=
-
-    # API Authentication
-    API_KEY=
+    # Supabase Configuration
+    NEXT_PUBLIC_SUPABASE_URL=
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=
     ```
   </Step>
 </Steps>
@@ -115,9 +113,9 @@ The platform uses environment variables for configuration. These should never be
 
 | Variable | Description | Required | Example |
 |----------|-------------|----------|----------|
-| `PORT` | Port for the web application | Yes | `3001` |
-| `DATABASE_URL` | Supabase database connection string | Yes | `postgresql://...` |
-| `API_KEY` | API authentication key | Yes | `your-secret-key` |
+| `PORT` | Port for the web application (development) | Yes | `3001` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Yes | `https://xxxxx.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous/public key | Yes | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 
 <Warning>
   Keep your `.env` file secure and never commit it to version control. It's already included in `.gitignore`.
@@ -147,21 +145,23 @@ Supabase provides the backend infrastructure including PostgreSQL database and a
     4. Wait 2-3 minutes for provisioning
   </Step>
 
-  <Step title="Get Database URL">
+  <Step title="Get API Credentials">
     Once your project is ready:
 
-    1. Navigate to **Settings** → **Database**
-    2. Scroll to **Connection string**
-    3. Select **URI** tab
-    4. Copy the connection string (looks like `postgresql://...`)
-    5. Replace `[YOUR-PASSWORD]` with your database password
+    1. Navigate to **Settings** → **API**
+    2. Find the **Project URL** section
+    3. Copy the **URL** (e.g., `https://xxxxxxxxxxxxx.supabase.co`)
+    4. Scroll down to **Project API keys**
+    5. Copy the **anon public** key (this is safe to use in client-side code)
   </Step>
 
   <Step title="Update .env File">
-    Add the connection string to your `.env` file:
+    Add your Supabase credentials to `.env`:
 
     ```bash .env
-    DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.xxxxxxxxxxxxx.supabase.co:5432/postgres
+    PORT=3001
+    NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     ```
   </Step>
 </Steps>
@@ -250,40 +250,16 @@ Configure Supabase Auth for user management:
   </Step>
 </Steps>
 
-## API Key Configuration
-
-Generate a secure API key for backend authentication:
-
-### Generating an API Key
-
-```bash
-# Generate a random API key (Linux/Mac)
-openssl rand -hex 32
-
-# Or use Node.js
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Add the generated key to your `.env` file:
-
-```bash .env
-API_KEY=your-generated-api-key-here
-```
-
-<Warning>
-  Use different API keys for development, staging, and production environments.
-</Warning>
-
 ## Multi-Environment Configuration
 
-For managing multiple environments (development, staging, production):
+For managing multiple environments (development, staging, production), create separate Supabase projects:
 
 ### Development Environment
 
 ```bash .env.development
 PORT=3001
-DATABASE_URL=postgresql://postgres:dev-password@db.dev.supabase.co:5432/postgres
-API_KEY=dev-api-key-12345
+NEXT_PUBLIC_SUPABASE_URL=https://dev-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...dev-key
 NODE_ENV=development
 ```
 
@@ -291,8 +267,8 @@ NODE_ENV=development
 
 ```bash .env.production
 PORT=3000
-DATABASE_URL=postgresql://postgres:prod-password@db.prod.supabase.co:5432/postgres
-API_KEY=prod-api-key-67890
+NEXT_PUBLIC_SUPABASE_URL=https://prod-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...prod-key
 NODE_ENV=production
 ```
 
@@ -313,9 +289,11 @@ When deploying to Vercel (as configured in the project):
 
   <Step title="Add Variables">
     Add each environment variable:
-    - **Key**: `DATABASE_URL`
-    - **Value**: Your Supabase connection string
-    - **Environments**: Select Production, Preview, or Development
+    - **Key**: `NEXT_PUBLIC_SUPABASE_URL`
+    - **Value**: Your Supabase project URL
+    - **Key**: `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+    - **Value**: Your Supabase anon key
+    - **Environments**: Select Production, Preview, or Development for each
   </Step>
 
   <Step title="Redeploy">
@@ -347,8 +325,8 @@ For production, pass environment variables explicitly:
 
 ```bash
 docker run -p 3000:3000 \
-  -e DATABASE_URL="postgresql://..." \
-  -e API_KEY="your-production-key" \
+  -e NEXT_PUBLIC_SUPABASE_URL="https://xxxxx.supabase.co" \
+  -e NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key" \
   --name nexusweb \
   ssubaru/nexushotel:latest
 ```
@@ -364,8 +342,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL}
-      - API_KEY=${API_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ```
 
 Then run:
@@ -382,14 +360,14 @@ For Kubernetes deployments using Helm:
   <Step title="Create Kubernetes Secret">
     ```bash
     kubectl create secret generic nexushotel-secrets \
-      --from-literal=DATABASE_URL="postgresql://..." \
-      --from-literal=API_KEY="your-api-key" \
+      --from-literal=NEXT_PUBLIC_SUPABASE_URL="https://xxxxx.supabase.co" \
+      --from-literal=NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key" \
       -n nexushotel
     ```
   </Step>
 
   <Step title="Reference in Deployment">
-    Helm charts automatically inject these secrets into pods. See `helm/` directory for configuration.
+    Helm charts automatically inject environment variables into pods. See `helm/values.yaml` for configuration.
   </Step>
 
   <Step title="Verify">
@@ -479,18 +457,18 @@ Verify your environment is correctly configured:
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Cannot connect to Supabase database">
+  <Accordion title="Cannot connect to Supabase">
     **Possible causes:**
-    1. Incorrect `DATABASE_URL` in `.env`
-    2. Wrong database password (check for special characters)
-    3. Supabase project paused (free tier pauses after inactivity)
-    4. Network/firewall blocking connection
+    1. Incorrect `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env`
+    2. Supabase project paused (free tier pauses after inactivity)
+    3. Network/firewall blocking connection
+    4. Invalid API key
 
     **Solutions:**
-    - Verify connection string in Supabase dashboard
-    - URL-encode special characters in password
+    - Verify URL and anon key in Supabase dashboard (Settings → API)
     - Wake up project by visiting Supabase dashboard
     - Check firewall/VPN settings
+    - Regenerate API keys if needed
   </Accordion>
 
   <Accordion title="Environment variables not loading">

@@ -9,15 +9,19 @@ Nexus Hotel uses environment variables for configuration across different deploy
 
 ## Local Development Variables
 
-These variables are defined in `.env.example` and should be configured in your local `.env` file.
+These variables should be configured in your local `.env` file.
 
 ### Application Variables
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `PORT` | number | No | `3001` | Port for local development server |
-| `DATABASE_URL` | string | Yes | - | Database connection string |
-| `API_KEY` | string | Yes | - | API authentication key |
+| `NEXT_PUBLIC_SUPABASE_URL` | string | Yes | - | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | string | Yes | - | Supabase anonymous/public key |
+
+<Note>
+The `.env.example` file in the repository contains placeholder variables. The actual application uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for Supabase integration.
+</Note>
 
 ## Docker Environment Variables
 
@@ -159,20 +163,18 @@ Variables prefixed with `NEXT_PUBLIC_` are embedded at build time:
 Server-side only variables (no `NEXT_PUBLIC_` prefix):
 
 - `NODE_ENV`
-- `DATABASE_URL`
-- `API_KEY`
+- `PORT`
+- `HOST`
 
 ## Setting Environment Variables
 
 ### Local Development
 
-Create `.env.local` file:
+Create `.env` file:
 
 ```bash
-# .env.local
+# .env
 PORT=3001
-DATABASE_URL=postgresql://user:password@localhost:5432/nexushotel
-API_KEY=your-api-key-here
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
