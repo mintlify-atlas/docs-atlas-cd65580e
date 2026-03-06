@@ -1,0 +1,132 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "Nexus Hotel DevOps Platform",
+  "projectDescription": "Cloud-native hotel reservation platform demonstrating enterprise DevOps practices with Docker, Kubernetes, Terraform, and CI/CD pipelines",
+  "theme": "aspen",
+  "primaryColor": "#1e40af",
+  "lightColor": "#3b82f6",
+  "darkColor": "#1e3a8a",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "architecture",
+              "business-plan"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "quickstart",
+              "local-development",
+              "environment-setup"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "infrastructure/docker",
+              "infrastructure/kubernetes",
+              "infrastructure/helm",
+              "infrastructure/terraform"
+            ]
+          },
+          {
+            "group": "CI/CD",
+            "pages": [
+              "cicd/overview",
+              "cicd/continuous-integration",
+              "cicd/continuous-deployment",
+              "cicd/github-actions"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/deployment",
+              "operations/monitoring",
+              "operations/security",
+              "operations/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Application",
+        "groups": [
+          {
+            "group": "Web Application",
+            "pages": [
+              "app/overview",
+              "app/frontend",
+              "app/components"
+            ]
+          },
+          {
+            "group": "API Service",
+            "pages": [
+              "app/api",
+              "app/database"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "app/monorepo",
+              "app/shared-packages"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Configuration",
+            "pages": [
+              "reference/docker-reference",
+              "reference/helm-values",
+              "reference/terraform-variables",
+              "reference/environment-variables"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "reference/commands",
+              "reference/project-structure",
+              "reference/tech-stack"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-stage Docker builds for development and production environments",
+    "Kubernetes orchestration with Helm chart management",
+    "Infrastructure as Code using Terraform for Vercel deployments",
+    "Automated CI/CD pipelines with GitHub Actions",
+    "Turborepo monorepo architecture with shared packages",
+    "Supabase integration for authentication and database",
+    "High availability with 3-replica Kubernetes deployments",
+    "Ingress controller configuration for external access"
+  ],
+  "publicApiSurface": [
+    "docker build -f Dockerfile.dev",
+    "docker compose up",
+    "helm upgrade --install nexushotel",
+    "kubectl get all -n nexushotel",
+    "terraform init",
+    "terraform apply",
+    "pnpm dev",
+    "pnpm build",
+    "next build",
+    "turbo run build"
+  ]
+}
