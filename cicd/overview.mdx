@@ -1,0 +1,102 @@
+---
+title: 'CI/CD Overview'
+description: 'Continuous Integration and Deployment pipeline architecture for Nexus Hotel'
+---
+
+## Pipeline Philosophy
+
+The Nexus Hotel DevOps Platform implements a modern CI/CD pipeline that automates the entire journey from code commit to production deployment. Our approach focuses on:
+
+- **Automation First**: Every merge to main triggers automatic deployment
+- **Infrastructure as Code**: All deployments managed through Helm charts
+- **Immutable Deployments**: Each deployment uses SHA-based image tags for traceability
+- **Zero-Downtime Updates**: Rolling updates ensure continuous availability
+
+## Architecture Overview
+
+The CI/CD pipeline consists of two main phases:
+
+<Steps>
+  <Step title="Continuous Integration">
+    Build and test the application, create Docker images, and push to container registry
+  </Step>
+  
+  <Step title="Continuous Deployment">
+    Deploy the tested images to Kubernetes using Helm with rolling updates
+  </Step>
+</Steps>
+
+## Technology Stack
+
+Our CI/CD pipeline leverages:
+
+- **GitHub Actions**: Workflow orchestration and automation
+- **Docker**: Container image building and distribution
+- **Helm**: Kubernetes package management and deployment
+- **Kubernetes**: Container orchestration platform
+- **Turborepo**: Monorepo build optimization
+
+## Workflow Triggers
+
+The deployment pipeline automatically triggers on:
+
+```yaml
+on:
+  push:
+    branches:
+      - main
+      - master
+```
+
+Every merge to the main branch initiates the full deployment workflow, ensuring that production always reflects the latest stable code.
+
+## Image Tagging Strategy
+
+We use Git commit SHA-based tagging for complete traceability:
+
+```bash
+IMAGE_TAG=${GITHUB_SHA::7}
+```
+
+This approach ensures:
+- Every deployment is traceable to a specific commit
+- Rollbacks are straightforward (redeploy a previous SHA)
+- No ambiguity about what code is running in production
+
+## Deployment Model
+
+The platform uses Helm's `upgrade --install` pattern:
+
+- **First deployment**: Creates all resources from scratch
+- **Subsequent deployments**: Performs rolling updates with zero downtime
+- **Automatic namespace creation**: `--create-namespace` ensures environment exists
+
+<Note>
+  The deployment waits up to 5 minutes for all pods to be ready before marking the deployment as successful.
+</Note>
+
+## Environment Configuration
+
+The application is deployed to the `nexushotel` namespace with the following defaults:
+
+- **Replicas**: 3 pods for high availability
+- **Resource requests**: 256Mi memory, 100m CPU
+- **Resource limits**: 512Mi memory, 500m CPU
+- **Service type**: ClusterIP (internal only)
+- **Ingress**: NGINX ingress controller
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Continuous Integration" icon="code" href="/cicd/continuous-integration">
+    Learn about build and test automation
+  </Card>
+  
+  <Card title="Continuous Deployment" icon="rocket" href="/cicd/continuous-deployment">
+    Explore Kubernetes deployment process
+  </Card>
+  
+  <Card title="GitHub Actions" icon="github" href="/cicd/github-actions">
+    Deep dive into workflow configuration
+  </Card>
+</CardGroup>

@@ -1,0 +1,167 @@
+---
+title: 'Continuous Integration'
+description: 'Build and test automation for the Nexus Hotel platform'
+---
+
+## Build Process Overview
+
+The Nexus Hotel platform uses a monorepo structure managed by Turborepo and pnpm. The CI process builds optimized Docker images ready for deployment to Kubernetes.
+
+## Monorepo Structure
+
+The project is organized as a Turborepo monorepo:
+
+```json
+{
+  "name": "proyecto-de-devops",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "check-types": "turbo run check-types"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": "22.x"
+  }
+}
+```
+
+## Docker Build Strategy
+
+The build process uses a multi-stage Dockerfile optimized for monorepo builds:
+
+<Steps>
+  <Step title="Base Image Setup">
+    Start with Node.js 22 slim image and enable pnpm via corepack
+    
+    ```dockerfile
+    FROM node:22-slim AS base
+    ENV PNPM_HOME="/pnpm"
+    ENV PATH="$PNPM_HOME:$PATH"
+    RUN corepack enable
+    ```
+  </Step>
+  
+  <Step title="Dependency Pruning">
+    Use Turborepo to prune the workspace for only the web app dependencies
+    
+    ```dockerfile
+    FROM base AS builder
+    WORKDIR /app
+    RUN npm install -g turbo
+    COPY . .
+    RUN turbo prune web --docker
+    ```
+  </Step>
+  
+  <Step title="Install Dependencies">
+    Install only the required dependencies for the web application
+    
+    ```dockerfile
+    FROM base AS installer
+    WORKDIR /app
+    COPY --from=builder /app/out/json/ .
+    COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+    RUN pnpm install
+    ```
+  </Step>
+  
+  <Step title="Build Application">
+    Build the web application using Turborepo's filtered build
+    
+    ```dockerfile
+    COPY --from=builder /app/out/full/ .
+    COPY turbo.json turbo.json
+    RUN npx turbo run build --filter=web...
+    ```
+  </Step>
+  
+  <Step title="Production Runtime">
+    Create minimal production image with only runtime dependencies
+    
+    ```dockerfile
+    FROM base AS runner
+    WORKDIR /app
+    COPY --from=installer /app .
+    EXPOSE 3000
+    CMD ["pnpm", "--filter", "web", "run", "start"]
+    ```
+  </Step>
+</Steps>
+
+## Turborepo Configuration
+
+The build pipeline is orchestrated by Turborepo with caching and dependency management:
+
+```json
+{
+  "tasks": {
+    "build": {
+      "env": ["VERCEL"],
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    }
+  }
+}
+```
+
+## Build Optimization
+
+The multi-stage build provides several optimizations:
+
+- **Layer Caching**: Dependencies are installed in a separate layer that can be cached
+- **Minimal Final Image**: Only production dependencies and built artifacts are included
+- **Workspace Pruning**: `turbo prune` ensures only necessary packages are included
+- **Parallel Builds**: Turborepo executes builds in optimal order based on dependencies
+
+## Image Registry
+
+Built images are pushed to Docker Hub:
+
+- **Repository**: `ssubaru/nexushotel`
+- **Tagging Strategy**: Short commit SHA (first 7 characters)
+- **Pull Policy**: `Always` in production to ensure latest images
+
+<Note>
+  The CI process should build and push images before the CD workflow runs. Ensure your CI workflow includes Docker build and push steps.
+</Note>
+
+## Local Build
+
+You can build the Docker image locally for testing:
+
+```bash
+# Build the image
+docker build -t nexushotel:local .
+
+# Run locally
+docker run -p 3000:3000 nexushotel:local
+```
+
+## Development vs Production
+
+The project includes separate Dockerfiles:
+
+- **Dockerfile**: Production build (multi-stage, optimized)
+- **Dockerfile.dev**: Development build with hot reload
+
+## Quality Gates
+
+Before deployment, ensure these quality checks pass:
+
+- **Type Checking**: `turbo run check-types`
+- **Linting**: `turbo run lint`
+- **Build Success**: `turbo run build`
+
+<Card title="Next: Continuous Deployment" icon="rocket" href="/cicd/continuous-deployment">
+  Learn how built images are deployed to Kubernetes
+</Card>

@@ -1,0 +1,138 @@
+---
+title: Application Overview
+description: Overview of the Nexus Hotel DevOps Platform web and API applications
+---
+
+The Nexus Hotel DevOps Platform consists of two main applications built in a Turborepo monorepo:
+
+## Applications
+
+### Web Application
+
+A modern Next.js 16 frontend application for hotel booking and management.
+
+<CardGroup cols={2}>
+  <Card title="Frontend" icon="browser" href="/app/frontend">
+    Next.js 16 with React 19, Turbopack, and Supabase authentication
+  </Card>
+  <Card title="Components" icon="cube" href="/app/components">
+    Reusable React components for UI elements
+  </Card>
+</CardGroup>
+
+**Key Features:**
+- Hotel room browsing and booking
+- Restaurant table reservations
+- Experience packages
+- User authentication with Supabase
+- Responsive design with CSS modules
+
+**Tech Stack:**
+- Next.js 16.0.10
+- React 19.2.1
+- Supabase Auth
+- TypeScript 5
+- Turbopack for development
+
+### API Application
+
+A lightweight Hono.js API service for backend operations.
+
+<Card title="API Service" icon="server" href="/app/api">
+  Hono.js API with shared constants from the monorepo
+</Card>
+
+**Key Features:**
+- Simple RESTful API
+- Shared constants with frontend
+- Fast development with srvx
+
+**Tech Stack:**
+- Hono.js (via Bun/Node runtime)
+- TypeScript 5.8.3
+- srvx for development
+
+## Project Structure
+
+```
+proyecto-de-devops/
+├── apps/
+│   ├── web/          # Next.js frontend
+│   └── api/          # Hono.js API
+├── packages/
+│   ├── ui/           # Shared UI components
+│   ├── constants/    # Shared constants
+│   ├── eslint-config/    # ESLint configurations
+│   └── typescript-config/ # TypeScript configurations
+├── turbo.json        # Turborepo configuration
+└── package.json      # Root package.json
+```
+
+## Development Commands
+
+<CodeGroup>
+
+```bash Terminal
+# Install dependencies
+pnpm install
+
+# Run all apps in development mode
+pnpm dev
+
+# Build all applications
+pnpm build
+
+# Run linting across all packages
+pnpm lint
+
+# Type checking
+pnpm check-types
+```
+
+</CodeGroup>
+
+## Monorepo Features
+
+<AccordionGroup>
+  <Accordion title="Turborepo">
+    Uses Turborepo for efficient task orchestration and caching. See [Monorepo Structure](/app/monorepo) for details.
+  </Accordion>
+  
+  <Accordion title="Shared Packages">
+    Multiple shared packages for code reuse across applications. See [Shared Packages](/app/shared-packages).
+  </Accordion>
+  
+  <Accordion title="Database Integration">
+    Supabase for authentication and data persistence. See [Database](/app/database).
+  </Accordion>
+</AccordionGroup>
+
+## Package Manager
+
+The project uses **pnpm 10.28.2** with workspace protocol for managing dependencies.
+
+```json package.json
+{
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": "22.x"
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Frontend Details" icon="react" href="/app/frontend">
+    Learn about the Next.js application structure
+  </Card>
+  <Card title="API Details" icon="code" href="/app/api">
+    Explore the Hono.js API service
+  </Card>
+  <Card title="Database" icon="database" href="/app/database">
+    Understand Supabase integration
+  </Card>
+  <Card title="Monorepo" icon="folder-tree" href="/app/monorepo">
+    Deep dive into Turborepo setup
+  </Card>
+</CardGroup>

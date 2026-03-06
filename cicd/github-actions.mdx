@@ -1,0 +1,356 @@
+---
+title: 'GitHub Actions Workflows'
+description: 'Detailed configuration of CI/CD automation with GitHub Actions'
+---
+
+## Workflow Overview
+
+The Nexus Hotel platform uses GitHub Actions to automate the continuous deployment pipeline. The workflow is defined in `.github/workflows/cd.yml`.
+
+## CD Workflow Configuration
+
+The complete workflow from the repository:
+
+```yaml
+name: CD – Deploy to Kubernetes
+
+# Se dispara cuando se hace merge de un PR a main/master
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    name: Deploy con Helm a Kubernetes
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Obtener el código del repositorio
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      # 2. Configurar kubectl usando el kubeconfig almacenado como Secret
+      - name: Configurar kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "latest"
+
+      - name: Escribir kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      # 3. Instalar Helm
+      - name: Instalar Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "latest"
+
+      # 4. Construir el tag de la imagen a partir del SHA del commit
+      #    Esto garantiza que coincida exactamente con la imagen subida en el CI
+      - name: Definir tag de imagen
+        id: vars
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # 5. Desplegar con Helm usando helm upgrade --install
+      #    Si el release no existe lo crea; si existe lo actualiza (rolling update)
+      - name: Helm upgrade --install
+        run: |
+          helm upgrade --install nexushotel ./helm \
+            --namespace nexushotel \
+            --create-namespace \
+            --set image.repository=ssubaru/nexushotel \
+            --set image.tag=${{ steps.vars.outputs.IMAGE_TAG }} \
+            --set image.pullPolicy=Always \
+            --wait \
+            --timeout 5m
+```
+
+## Workflow Breakdown
+
+<Steps>
+  <Step title="Trigger Configuration">
+    The workflow triggers on pushes to main or master branches
+    
+    ```yaml
+    on:
+      push:
+        branches:
+          - main
+          - master
+    ```
+    
+    This ensures deployments only occur for merged pull requests, not feature branches.
+  </Step>
+  
+  <Step title="Repository Checkout">
+    Fetch the source code including Helm charts
+    
+    ```yaml
+    - name: Checkout del repositorio
+      uses: actions/checkout@v4
+    ```
+    
+    Uses the latest v4 action for improved performance and security.
+  </Step>
+  
+  <Step title="Kubernetes Configuration">
+    Setup kubectl and authenticate to the cluster
+    
+    ```yaml
+    - name: Configurar kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: "latest"
+
+    - name: Escribir kubeconfig
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+        chmod 600 $HOME/.kube/config
+    ```
+    
+    The KUBECONFIG secret contains cluster credentials and configuration.
+  </Step>
+  
+  <Step title="Helm Installation">
+    Install Helm package manager
+    
+    ```yaml
+    - name: Instalar Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: "latest"
+    ```
+  </Step>
+  
+  <Step title="Image Tag Generation">
+    Create a unique tag from the commit SHA
+    
+    ```yaml
+    - name: Definir tag de imagen
+      id: vars
+      run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+    ```
+    
+    This uses the first 7 characters of the Git commit SHA for image versioning.
+  </Step>
+  
+  <Step title="Helm Deployment">
+    Deploy the application using Helm
+    
+    ```yaml
+    - name: Helm upgrade --install
+      run: |
+        helm upgrade --install nexushotel ./helm \
+          --namespace nexushotel \
+          --create-namespace \
+          --set image.repository=ssubaru/nexushotel \
+          --set image.tag=${{ steps.vars.outputs.IMAGE_TAG }} \
+          --set image.pullPolicy=Always \
+          --wait \
+          --timeout 5m
+    ```
+  </Step>
+</Steps>
+
+## Required GitHub Secrets
+
+The workflow requires the following secrets to be configured in your GitHub repository:
+
+### KUBECONFIG
+
+Kubernetes cluster configuration and credentials.
+
+<Steps>
+  <Step title="Generate kubeconfig">
+    Get your cluster's kubeconfig file:
+    
+    ```bash
+    # For most Kubernetes clusters
+    kubectl config view --raw --minify
+    ```
+  </Step>
+  
+  <Step title="Add to GitHub Secrets">
+    1. Go to your repository on GitHub
+    2. Navigate to Settings > Secrets and variables > Actions
+    3. Click "New repository secret"
+    4. Name: `KUBECONFIG`
+    5. Value: Paste the entire kubeconfig content
+    6. Click "Add secret"
+  </Step>
+  
+  <Step title="Verify Permissions">
+    Ensure the kubeconfig has permissions to:
+    
+    - Create namespaces
+    - Create/update deployments, services, and ingresses
+    - Manage Helm releases
+  </Step>
+</Steps>
+
+<Note>
+  The kubeconfig secret should have minimal permissions needed for deployment. Consider using a service account with RBAC restrictions rather than cluster-admin credentials.
+</Note>
+
+## Workflow Parameters
+
+### Helm Flags Explained
+
+| Flag | Purpose |
+|------|--------|
+| `--namespace nexushotel` | Deploy to the nexushotel namespace |
+| `--create-namespace` | Create namespace if it doesn't exist |
+| `--set image.tag=...` | Override the image tag from values.yaml |
+| `--set image.pullPolicy=Always` | Always pull latest image from registry |
+| `--wait` | Wait for resources to be ready before completing |
+| `--timeout 5m` | Maximum wait time for deployment |
+
+### Environment Variables
+
+The workflow has access to GitHub Actions default environment variables:
+
+- `GITHUB_SHA`: Full commit SHA
+- `GITHUB_REF`: Git reference (branch/tag)
+- `GITHUB_REPOSITORY`: Repository name
+- `GITHUB_WORKSPACE`: Workspace directory path
+
+## Deployment Timeline
+
+Typical deployment duration:
+
+1. **Checkout**: 5-10 seconds
+2. **Setup kubectl**: 5-10 seconds
+3. **Setup Helm**: 5-10 seconds
+4. **Helm deployment**: 1-3 minutes
+   - Image pull: 30-60 seconds
+   - Pod startup: 30-60 seconds
+   - Health checks: 10-30 seconds
+
+**Total**: ~2-4 minutes for a complete deployment
+
+## Monitoring Workflow Execution
+
+View workflow runs in GitHub:
+
+1. Go to the "Actions" tab in your repository
+2. Click on "CD – Deploy to Kubernetes"
+3. Select a workflow run to view logs
+
+### Workflow Status
+
+- **Success**: All steps completed, deployment is live
+- **Failure**: Check logs for errors
+- **In Progress**: Deployment currently running
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="KUBECONFIG authentication failed">
+    **Problem**: Workflow fails at kubectl configuration step
+    
+    **Solutions**:
+    - Verify KUBECONFIG secret is set correctly
+    - Check that kubeconfig hasn't expired
+    - Ensure cluster is accessible from GitHub Actions runners
+    - Verify service account has necessary permissions
+  </Accordion>
+  
+  <Accordion title="Helm deployment timeout">
+    **Problem**: Deployment exceeds 5-minute timeout
+    
+    **Solutions**:
+    - Check pod logs: `kubectl logs -n nexushotel -l app=nexushotel-web`
+    - Verify image exists in registry
+    - Check resource quotas in namespace
+    - Increase timeout value if needed
+  </Accordion>
+  
+  <Accordion title="Image pull errors">
+    **Problem**: Pods fail to pull Docker image
+    
+    **Solutions**:
+    - Verify image tag matches what was pushed to registry
+    - Check Docker Hub repository is public or credentials are configured
+    - Ensure image repository name is correct: `ssubaru/nexushotel`
+  </Accordion>
+  
+  <Accordion title="Namespace creation failed">
+    **Problem**: Cannot create nexushotel namespace
+    
+    **Solutions**:
+    - Verify kubeconfig has cluster-admin or namespace creation permissions
+    - Check if namespace already exists: `kubectl get ns nexushotel`
+    - Review RBAC policies for service account
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<Warning>
+  Never commit secrets or kubeconfig files to the repository. Always use GitHub Secrets for sensitive data.
+</Warning>
+
+### Recommendations
+
+1. **Use Service Accounts**: Create dedicated Kubernetes service accounts for GitHub Actions
+2. **Minimal Permissions**: Grant only the permissions needed for deployment
+3. **Rotate Credentials**: Regularly update kubeconfig and service account tokens
+4. **Audit Logs**: Monitor deployment activities in Kubernetes audit logs
+5. **Private Repositories**: Consider using private Docker registries with image pull secrets
+
+## Extending the Workflow
+
+### Adding CI Steps
+
+You can add build and test steps before deployment:
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: |
+          docker build -t ssubaru/nexushotel:${GITHUB_SHA::7} .
+      - name: Push to registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push ssubaru/nexushotel:${GITHUB_SHA::7}
+
+  deploy:
+    needs: build
+    # ... existing deploy job
+```
+
+### Adding Notifications
+
+Notify team on deployment completion:
+
+```yaml
+- name: Notify deployment
+  if: success()
+  run: |
+    curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+      -H 'Content-Type: application/json' \
+      -d '{"text":"Deployment successful: ${{ github.sha }}"}'
+```
+
+## Workflow Best Practices
+
+- **Use specific action versions**: Pin to major versions (e.g., `@v4`) for stability
+- **Add status badges**: Display workflow status in README
+- **Enable branch protection**: Require workflows to pass before merging
+- **Use environments**: Configure GitHub environments for production deployments
+- **Cache dependencies**: Cache Docker layers and Helm charts for faster builds
+
+<Card title="Back to CI/CD Overview" icon="arrow-left" href="/cicd/overview">
+  Return to the CI/CD overview page
+</Card>

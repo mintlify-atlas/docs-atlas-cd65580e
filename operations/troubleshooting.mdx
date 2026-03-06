@@ -1,0 +1,667 @@
+---
+title: Troubleshooting Guide
+description: Common issues and solutions for Nexus Hotel DevOps Platform operations
+---
+
+# Troubleshooting Guide
+
+This guide covers common issues encountered when operating the Nexus Hotel platform and their solutions.
+
+## Quick Diagnostics
+
+Start with these commands to gather information:
+
+```bash
+# Check overall cluster health
+kubectl get all -n nexushotel
+
+# Check pod status and recent events
+kubectl get events -n nexushotel --sort-by='.lastTimestamp'
+
+# View application logs
+kubectl logs -n nexushotel -l app=nexushotel-web --tail=50
+```
+
+---
+
+## Deployment Issues
+
+<Accordion title="Pods not starting or stuck in Pending state">
+  ### Symptoms
+  - Pods show status `Pending`
+  - Deployment shows fewer ready replicas than desired (e.g., 0/3)
+  
+  ### Diagnosis
+  ```bash
+  # Check pod status and events
+  kubectl describe pod <pod-name> -n nexushotel
+  
+  # Check node resources
+  kubectl top nodes
+  
+  # Check resource quotas
+  kubectl describe resourcequota -n nexushotel
+  ```
+  
+  ### Common Causes and Solutions
+  
+  **1. Insufficient Node Resources**
+  - **Cause**: Not enough CPU or memory on nodes
+  - **Solution**: Scale cluster nodes or reduce resource requests in helm/values.yaml
+  
+  **2. Image Pull Errors**
+  - **Cause**: Cannot pull Docker image `ssubaru/nexushotel:latest`
+  - **Solution**: Verify image exists in registry, check image pull secrets
+  ```bash
+  # Verify image exists
+  docker pull ssubaru/nexushotel:latest
+  
+  # Check image pull policy
+  kubectl get deployment nexushotel-web -n nexushotel -o yaml | grep imagePullPolicy
+  ```
+  
+  **3. PVC Binding Issues**
+  - **Cause**: PersistentVolumeClaim not bound
+  - **Solution**: Check storage class availability
+  ```bash
+  kubectl get pvc -n nexushotel
+  kubectl get storageclass
+  ```
+</Accordion>
+
+<Accordion title="Pods crashing or in CrashLoopBackOff state">
+  ### Symptoms
+  - Pods show status `CrashLoopBackOff` or `Error`
+  - Frequent pod restarts visible in `kubectl get pods`
+  
+  ### Diagnosis
+  ```bash
+  # View current logs
+  kubectl logs <pod-name> -n nexushotel
+  
+  # View logs from previous crashed container
+  kubectl logs <pod-name> -n nexushotel --previous
+  
+  # Check pod events
+  kubectl describe pod <pod-name> -n nexushotel
+  ```
+  
+  ### Common Causes and Solutions
+  
+  **1. Application Errors**
+  - **Cause**: Application code crashes on startup
+  - **Solution**: Review logs for error messages, check environment variables
+  ```bash
+  # Check environment variables are set correctly
+  kubectl exec -n nexushotel <pod-name> -- env | grep SUPABASE
+  ```
+  
+  **2. Missing Environment Variables**
+  - **Cause**: Required Supabase credentials not configured
+  - **Solution**: Verify secrets are created and referenced correctly
+  ```bash
+  # Check secrets exist
+  kubectl get secrets -n nexushotel
+  
+  # Verify secret contents (base64 encoded)
+  kubectl get secret supabase-credentials -n nexushotel -o yaml
+  ```
+  
+  **3. Port Conflicts**
+  - **Cause**: Application trying to bind to wrong port
+  - **Solution**: Verify PORT environment variable is set to 3000 (helm/values.yaml:troubleshooting.mdx:36)
+  
+  **4. OOMKilled (Out of Memory)**
+  - **Cause**: Pod exceeds memory limit (512Mi)
+  - **Solution**: Increase memory limit or optimize application
+  ```bash
+  # Check if pod was OOMKilled
+  kubectl describe pod <pod-name> -n nexushotel | grep -i oom
+  
+  # Monitor memory usage
+  kubectl top pod <pod-name> -n nexushotel
+  ```
+</Accordion>
+
+<Accordion title="Deployment rollout stuck or timing out">
+  ### Symptoms
+  - `helm upgrade` hangs and eventually times out
+  - Old pods not terminating
+  - New pods not reaching Ready state
+  
+  ### Diagnosis
+  ```bash
+  # Check rollout status
+  kubectl rollout status deployment/nexushotel-web -n nexushotel
+  
+  # View rollout history
+  kubectl rollout history deployment/nexushotel-web -n nexushotel
+  
+  # Check replica sets
+  kubectl get rs -n nexushotel
+  ```
+  
+  ### Solutions
+  
+  **1. Rollback to Previous Version**
+  ```bash
+  # View previous revisions
+  helm history nexushotel -n nexushotel
+  
+  # Rollback to previous release
+  helm rollback nexushotel -n nexushotel
+  
+  # Or rollback with kubectl
+  kubectl rollout undo deployment/nexushotel-web -n nexushotel
+  ```
+  
+  **2. Force Restart Deployment**
+  ```bash
+  # Delete old pods manually
+  kubectl delete pod <pod-name> -n nexushotel --force --grace-period=0
+  
+  # Or restart entire deployment
+  kubectl rollout restart deployment/nexushotel-web -n nexushotel
+  ```
+  
+  **3. Check Readiness Probes**
+  - Readiness probes may be failing
+  - Solution: Review application health endpoint, adjust probe timings
+</Accordion>
+
+---
+
+## Networking Issues
+
+<Accordion title="Cannot access application externally">
+  ### Symptoms
+  - Application not accessible via browser
+  - Ingress returning 502/503/504 errors
+  - Connection timeouts
+  
+  ### Diagnosis
+  ```bash
+  # Check service endpoints
+  kubectl get svc -n nexushotel
+  kubectl describe svc nexushotel-svc -n nexushotel
+  
+  # Check ingress configuration
+  kubectl get ingress -n nexushotel
+  kubectl describe ingress -n nexushotel
+  
+  # Check ingress controller logs
+  kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
+  ```
+  
+  ### Solutions
+  
+  **1. Service Not Routing to Pods**
+  ```bash
+  # Verify service endpoints exist
+  kubectl get endpoints nexushotel-svc -n nexushotel
+  
+  # Check if selector matches pod labels
+  kubectl get svc nexushotel-svc -n nexushotel -o yaml | grep selector
+  kubectl get pods -n nexushotel --show-labels
+  ```
+  
+  **2. Ingress Not Configured**
+  - Verify ingress controller is installed
+  - Check host configuration matches: `nexushotel.local`
+  - Update /etc/hosts if testing locally
+  
+  **3. Port Forwarding for Testing**
+  ```bash
+  # Bypass ingress and test service directly
+  kubectl port-forward -n nexushotel svc/nexushotel-svc 8080:80
+  
+  # Access at http://localhost:8080
+  ```
+  
+  **4. Expose via LoadBalancer (Local Testing)**
+  ```bash
+  # Change service type to LoadBalancer for Docker Desktop/Minikube
+  kubectl patch svc nexushotel-svc -n nexushotel -p '{"spec": {"type": "LoadBalancer"}}'
+  ```
+</Accordion>
+
+<Accordion title="Service discovery issues between pods">
+  ### Symptoms
+  - Pods cannot communicate with each other
+  - DNS resolution failures
+  - Connection refused errors between services
+  
+  ### Diagnosis
+  ```bash
+  # Test DNS resolution from a pod
+  kubectl exec -n nexushotel <pod-name> -- nslookup nexushotel-svc
+  
+  # Test connectivity
+  kubectl exec -n nexushotel <pod-name> -- curl nexushotel-svc:80
+  
+  # Check network policies
+  kubectl get networkpolicies -n nexushotel
+  ```
+  
+  ### Solutions
+  
+  **1. Verify Service ClusterIP**
+  ```bash
+  # Check service has ClusterIP assigned
+  kubectl get svc nexushotel-svc -n nexushotel
+  ```
+  
+  **2. Check Network Policies**
+  - Network policies may be blocking traffic
+  - Ensure policies allow ingress/egress as needed
+  
+  **3. CoreDNS Issues**
+  ```bash
+  # Check CoreDNS pods are running
+  kubectl get pods -n kube-system -l k8s-app=kube-dns
+  
+  # Restart CoreDNS if needed
+  kubectl rollout restart deployment/coredns -n kube-system
+  ```
+</Accordion>
+
+---
+
+## Docker Issues
+
+<Accordion title="Docker image build failures">
+  ### Symptoms
+  - `docker build` command fails
+  - Build timeouts
+  - Dependency installation errors
+  
+  ### Diagnosis
+  ```bash
+  # Check Docker daemon status
+  docker info
+  
+  # View build logs with no cache
+  docker build -f Dockerfile --no-cache -t nexushotel .
+  ```
+  
+  ### Common Causes and Solutions
+  
+  **1. Dependency Installation Failures**
+  - **Cause**: pnpm install fails in container
+  - **Solution**: Check internet connectivity, verify pnpm-lock.yaml exists
+  ```bash
+  # Test build with verbose output
+  docker build -f Dockerfile --progress=plain -t nexushotel .
+  ```
+  
+  **2. Multi-stage Build Issues**
+  - **Cause**: Files not copied correctly between stages
+  - **Solution**: Verify COPY commands in Dockerfile reference correct stage
+  
+  **3. Out of Disk Space**
+  ```bash
+  # Check Docker disk usage
+  docker system df
+  
+  # Clean up unused resources
+  docker system prune -a
+  ```
+</Accordion>
+
+<Accordion title="Docker container won't start">
+  ### Symptoms
+  - `docker run` exits immediately
+  - Container stops right after starting
+  
+  ### Diagnosis
+  ```bash
+  # View container logs
+  docker logs <container-name>
+  
+  # Check container exit code
+  docker inspect <container-name> --format='{{.State.ExitCode}}'
+  
+  # Run container interactively for debugging
+  docker run -it nexushotel /bin/sh
+  ```
+  
+  ### Solutions
+  
+  **1. Missing Environment Variables**
+  - Ensure `.env` file exists with required variables:
+    - `NEXT_PUBLIC_SUPABASE_URL`
+    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  
+  **2. Port Already in Use**
+  ```bash
+  # Check if port 3000 or 3001 is in use
+  lsof -i :3000
+  
+  # Use different port
+  docker run -p 3002:3000 --env-file .env nexushotel
+  ```
+  
+  **3. Permission Issues**
+  - Container may need different user permissions
+  - Check file permissions in mounted volumes
+</Accordion>
+
+---
+
+## Helm Issues
+
+<Accordion title="Helm chart validation errors">
+  ### Symptoms
+  - `helm lint` reports errors
+  - `helm install` fails with validation errors
+  - Template rendering fails
+  
+  ### Diagnosis
+  ```bash
+  # Validate chart syntax
+  helm lint ./helm
+  
+  # Dry-run installation
+  helm install nexushotel ./helm --dry-run --debug -n nexushotel
+  
+  # Preview generated manifests
+  helm template nexushotel ./helm --set image.tag=latest
+  ```
+  
+  ### Solutions
+  
+  **1. YAML Syntax Errors**
+  - Check indentation (use spaces, not tabs)
+  - Validate YAML syntax online or with yamllint
+  
+  **2. Missing Required Values**
+  - Ensure all required values are set in values.yaml
+  - Override with `--set` if needed
+  
+  **3. Template Errors**
+  - Review template helpers in `_helpers.tpl`
+  - Test templates with different value combinations
+</Accordion>
+
+<Accordion title="Helm upgrade fails or times out">
+  ### Symptoms
+  - `helm upgrade` command hangs
+  - Upgrade times out after waiting
+  - Release enters failed state
+  
+  ### Diagnosis
+  ```bash
+  # Check release status
+  helm status nexushotel -n nexushotel
+  
+  # View release history
+  helm history nexushotel -n nexushotel
+  
+  # Check pending resources
+  kubectl get all -n nexushotel
+  ```
+  
+  ### Solutions
+  
+  **1. Rollback Failed Release**
+  ```bash
+  # Rollback to previous successful release
+  helm rollback nexushotel -n nexushotel
+  
+  # Or rollback to specific revision
+  helm rollback nexushotel 2 -n nexushotel
+  ```
+  
+  **2. Force Upgrade**
+  ```bash
+  # Force helm upgrade
+  helm upgrade nexushotel ./helm \
+    --namespace nexushotel \
+    --force \
+    --wait
+  ```
+  
+  **3. Uninstall and Reinstall**
+  ```bash
+  # Last resort: complete reinstall
+  helm uninstall nexushotel -n nexushotel
+  helm install nexushotel ./helm -n nexushotel --create-namespace
+  ```
+</Accordion>
+
+---
+
+## Database Issues (Supabase)
+
+<Accordion title="Cannot connect to Supabase">
+  ### Symptoms
+  - Application cannot reach Supabase API
+  - Authentication failures
+  - Database query timeouts
+  
+  ### Diagnosis
+  ```bash
+  # Check environment variables are set
+  kubectl exec -n nexushotel <pod-name> -- env | grep SUPABASE
+  
+  # Test connectivity from pod
+  kubectl exec -n nexushotel <pod-name> -- curl -I $NEXT_PUBLIC_SUPABASE_URL
+  
+  # View application logs for Supabase errors
+  kubectl logs -n nexushotel -l app=nexushotel-web | grep -i supabase
+  ```
+  
+  ### Solutions
+  
+  **1. Verify Credentials**
+  - Check Supabase URL and anon key are correct
+  - Verify credentials in Supabase dashboard
+  - Ensure no typos in environment variables
+  
+  **2. Network Connectivity**
+  - Check cluster has internet access
+  - Verify firewall rules allow outbound HTTPS
+  - Check if Supabase service is operational
+  
+  **3. API Rate Limits**
+  - Supabase may be rate limiting requests
+  - Check Supabase dashboard for usage metrics
+  - Implement request throttling in application
+</Accordion>
+
+<Accordion title="Supabase authentication errors">
+  ### Symptoms
+  - Users cannot log in
+  - JWT token errors
+  - Session expiration issues
+  
+  ### Solutions
+  
+  **1. Verify Row Level Security**
+  - Ensure RLS policies are configured correctly
+  - Check policies allow necessary operations
+  - Test with Supabase SQL editor
+  
+  **2. Check Auth Settings**
+  - Verify email confirmation is not required (or is handled)
+  - Check redirect URLs are configured
+  - Verify OAuth providers if using social login
+  
+  **3. Token Issues**
+  - Ensure JWT secret is not exposed
+  - Check token expiration settings
+  - Verify application handles token refresh
+</Accordion>
+
+---
+
+## CI/CD Pipeline Issues
+
+<Accordion title="GitHub Actions workflow failing">
+  ### Symptoms
+  - CD workflow in `.github/workflows/cd.yml` fails
+  - Deployment not triggered after merge
+  - kubectl commands fail in workflow
+  
+  ### Diagnosis
+  - Check GitHub Actions tab for error logs
+  - Review workflow run details
+  - Check secrets are configured correctly
+  
+  ### Common Causes and Solutions
+  
+  **1. Missing KUBECONFIG Secret**
+  - **Cause**: `KUBECONFIG` secret not configured in GitHub
+  - **Solution**: Add secret in repository Settings → Secrets and variables → Actions
+  
+  **2. Invalid KUBECONFIG**
+  - **Cause**: KUBECONFIG content is incorrect or expired
+  - **Solution**: Update secret with fresh kubeconfig from cluster
+  
+  **3. Helm Installation Fails**
+  - **Cause**: Helm chart validation errors
+  - **Solution**: Test locally with `helm lint ./helm` before pushing
+  
+  **4. Image Tag Mismatch**
+  - **Cause**: Image with commit SHA tag not found
+  - **Solution**: Ensure CI builds and pushes image before CD runs
+</Accordion>
+
+<Accordion title="Terraform apply failures">
+  ### Symptoms
+  - `terraform apply` fails with errors
+  - Provider authentication issues
+  - Resource conflicts
+  
+  ### Diagnosis
+  ```bash
+  # Review Terraform plan
+  cd terraform
+  terraform plan
+  
+  # Check provider configuration
+  terraform providers
+  
+  # Validate configuration
+  terraform validate
+  ```
+  
+  ### Solutions
+  
+  **1. Provider Authentication**
+  - Ensure Vercel API token is configured
+  - Check token has required permissions
+  - Verify team ID is correct
+  
+  **2. State Lock Issues**
+  ```bash
+  # Force unlock if needed (use with caution)
+  terraform force-unlock <lock-id>
+  ```
+  
+  **3. Resource Already Exists**
+  - Import existing resource into Terraform state
+  - Or delete resource manually and re-apply
+  
+  **4. Variable Issues**
+  - Verify all required variables are set in `terraform.tfvars`
+  - Check variable types match definitions in `variables.tf`
+</Accordion>
+
+---
+
+## Performance Issues
+
+<Accordion title="High CPU or memory usage">
+  ### Symptoms
+  - Pods consuming excessive resources
+  - Application slowness
+  - Pods being OOMKilled
+  
+  ### Diagnosis
+  ```bash
+  # Check resource usage
+  kubectl top pods -n nexushotel
+  kubectl top nodes
+  
+  # View resource limits
+  kubectl describe pod <pod-name> -n nexushotel | grep -A 5 Limits
+  ```
+  
+  ### Solutions
+  
+  **1. Increase Resource Limits**
+  - Current limits: 512Mi memory, 500m CPU (helm/values.yaml:troubleshooting.mdx:39-46)
+  - Edit `helm/values.yaml` to increase limits
+  - Apply with `helm upgrade`
+  
+  **2. Optimize Application**
+  - Profile application to find bottlenecks
+  - Optimize database queries
+  - Implement caching
+  - Review memory leaks
+  
+  **3. Horizontal Pod Autoscaling**
+  ```bash
+  # Create HPA to automatically scale pods
+  kubectl autoscale deployment nexushotel-web \
+    --cpu-percent=70 \
+    --min=3 \
+    --max=10 \
+    -n nexushotel
+  ```
+</Accordion>
+
+<Accordion title="Slow response times">
+  ### Symptoms
+  - High latency for API requests
+  - Slow page loads
+  - Timeouts
+  
+  ### Diagnosis
+  - Check Grafana dashboards for performance metrics
+  - Review application logs for slow queries
+  - Monitor database performance in Supabase
+  
+  ### Solutions
+  
+  **1. Database Optimization**
+  - Add indexes on frequently queried columns
+  - Optimize complex queries
+  - Use connection pooling
+  
+  **2. CDN and Caching**
+  - Implement CDN for static assets
+  - Add Redis for application caching
+  - Use browser caching headers
+  
+  **3. Scale Horizontally**
+  - Increase replica count beyond 3
+  - Distribute load across more pods
+</Accordion>
+
+---
+
+## Getting More Help
+
+If you cannot resolve the issue:
+
+1. **Collect Diagnostic Information**
+   ```bash
+   # Create a support bundle
+   kubectl logs -n nexushotel -l app=nexushotel-web --tail=500 > logs.txt
+   kubectl describe pods -n nexushotel > pods-describe.txt
+   kubectl get events -n nexushotel --sort-by='.lastTimestamp' > events.txt
+   ```
+
+2. **Check Project Management**
+   - Review Jira board: https://hoteldevops.atlassian.net/jira/core/projects/NXS/calendar
+   - Check if similar issues have been reported
+
+3. **Review Documentation**
+   - Revisit deployment, monitoring, and security guides
+   - Check official documentation for Kubernetes, Helm, Supabase
+
+4. **Contact Team**
+   - Escalate to DevOps team with diagnostic information
+   - Include reproduction steps and error messages

@@ -1,0 +1,667 @@
+---
+title: 'Terraform Configuration'
+description: 'Infrastructure as Code for Vercel project provisioning and management'
+---
+
+## Overview
+
+The Nexus Hotel platform uses Terraform to manage infrastructure as code for Vercel deployments. The configuration automates the creation of Vercel projects for both web and API applications, including environment variable management and GitHub integration.
+
+## Architecture
+
+The Terraform configuration provisions:
+
+<CardGroup cols={2}>
+  <Card title="Web Project" icon="browser">
+    Next.js application deployed to Vercel with Turbo build
+  </Card>
+  
+  <Card title="API Project" icon="server">
+    API service with custom build configuration
+  </Card>
+  
+  <Card title="Environment Variables" icon="key">
+    Supabase credentials injected across all environments
+  </Card>
+  
+  <Card title="GitHub Integration" icon="github">
+    Automatic deployments from GitHub repository
+  </Card>
+</CardGroup>
+
+## File Structure
+
+The Terraform configuration is organized in the `terraform/` directory:
+
+```
+terraform/
+├── provider.tf          # Vercel provider configuration
+├── variables.tf         # Input variable definitions
+└── main.tf             # Resource definitions
+```
+
+## Provider Configuration
+
+The `provider.tf` file configures the Vercel provider:
+
+```hcl
+terraform {
+  required_providers {
+    vercel = {
+      source  = "vercel/vercel"
+      version = "~> 1.0"
+    }
+  }
+}
+
+provider "vercel" {
+  api_token = var.vercel_api_token
+  team      = var.vercel_team_id
+}
+```
+
+**Provider Details:**
+- **Source**: `vercel/vercel` official provider
+- **Version**: `~> 1.0` (accepts 1.x versions)
+- **Authentication**: API token with team scope
+
+## Variables
+
+The `variables.tf` file defines all configurable parameters:
+
+```hcl
+variable "vercel_api_token" {
+  description = "The API token for Vercel authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "vercel_team_id" {
+  description = "The Team ID for Vercel Organization"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "The GitHub repository name (e.g., user/repo)"
+  type        = string
+  default     = "PavoAyala/proyecto-de-devops"
+}
+
+variable "supabase_url" {
+  description = "The Supabase URL"
+  type        = string
+}
+
+variable "supabase_anon_key" {
+  description = "The Supabase Anon Key"
+  type        = string
+  sensitive   = true
+}
+```
+
+<Warning>
+**Sensitive Variables**: `vercel_api_token` and `supabase_anon_key` are marked as sensitive and will not be displayed in logs.
+</Warning>
+
+## Resource Definitions
+
+### Web Project
+
+The web project resource creates a Vercel project for the Next.js application:
+
+```hcl
+resource "vercel_project" "web" {
+  name      = "hotel-project-web"
+  framework = "nextjs"
+  team_id   = var.vercel_team_id
+
+  git_repository = {
+    type = "github"
+    repo = var.github_repo
+  }
+
+  root_directory = "apps/web"
+
+  # Manual configuration overrides
+  install_command = "pnpm install --prefix=../.."
+  build_command   = "npx turbo run build --filter=web"
+}
+```
+
+**Configuration:**
+- **Name**: `hotel-project-web`
+- **Framework**: Next.js with automatic detection
+- **Root**: `apps/web` directory in monorepo
+- **Install**: Uses pnpm from repository root
+- **Build**: Turbo builds with web filter
+
+### API Project
+
+The API project resource creates a Vercel project for the API service:
+
+```hcl
+resource "vercel_project" "api" {
+  name    = "hotel-project-api"
+  team_id = var.vercel_team_id
+
+  git_repository = {
+    type = "github"
+    repo = var.github_repo
+  }
+
+  root_directory = "apps/api"
+
+  # Manual configuration overrides
+  install_command  = "pnpm install --prefix=../.."
+  build_command    = "cd ../.. && npx turbo run build --filter=api"
+  output_directory = "dist"
+}
+```
+
+**Configuration:**
+- **Name**: `hotel-project-api`
+- **Root**: `apps/api` directory in monorepo
+- **Install**: Uses pnpm from repository root
+- **Build**: Turbo builds from root directory
+- **Output**: Compiled to `dist` directory
+
+### Environment Variables
+
+Environment variables are injected into both projects across all Vercel environments:
+
+<Tabs>
+  <Tab title="Web Environment">
+    ```hcl
+    resource "vercel_project_environment_variable" "web_url" {
+      project_id = vercel_project.web.id
+      team_id    = var.vercel_team_id
+      key        = "NEXT_PUBLIC_SUPABASE_URL"
+      value      = var.supabase_url
+      target     = ["production", "preview", "development"]
+    }
+
+    resource "vercel_project_environment_variable" "web_key" {
+      project_id = vercel_project.web.id
+      team_id    = var.vercel_team_id
+      key        = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      value      = var.supabase_anon_key
+      target     = ["production", "preview", "development"]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="API Environment">
+    ```hcl
+    resource "vercel_project_environment_variable" "api_url" {
+      project_id = vercel_project.api.id
+      team_id    = var.vercel_team_id
+      key        = "NEXT_PUBLIC_SUPABASE_URL"
+      value      = var.supabase_url
+      target     = ["production", "preview", "development"]
+    }
+
+    resource "vercel_project_environment_variable" "api_key" {
+      project_id = vercel_project.api.id
+      team_id    = var.vercel_team_id
+      key        = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      value      = var.supabase_anon_key
+      target     = ["production", "preview", "development"]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+**Environment Targets:**
+- **production**: Live production deployments
+- **preview**: Pull request preview deployments
+- **development**: Local development builds
+
+## Usage
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install Terraform">
+    Download and install Terraform CLI:
+    
+    ```bash
+    # macOS
+    brew install terraform
+    
+    # Linux
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+    sudo apt-get update && sudo apt-get install terraform
+    
+    # Verify installation
+    terraform version
+    ```
+  </Step>
+  
+  <Step title="Vercel API Token">
+    Generate a Vercel API token:
+    
+    1. Go to [Vercel Account Settings](https://vercel.com/account/tokens)
+    2. Click "Create Token"
+    3. Name it "Terraform" and select appropriate scope
+    4. Copy the token (shown only once)
+  </Step>
+  
+  <Step title="Team ID">
+    Find your Vercel Team ID:
+    
+    ```bash
+    # From Vercel dashboard URL
+    # https://vercel.com/[team-id]/...
+    ```
+  </Step>
+  
+  <Step title="Supabase Credentials">
+    Get Supabase project credentials from the Supabase dashboard
+  </Step>
+</Steps>
+
+### Initialize Terraform
+
+Navigate to the terraform directory and initialize:
+
+```bash
+cd terraform
+
+# Initialize providers and modules
+terraform init
+```
+
+This downloads the Vercel provider and prepares the working directory.
+
+### Configure Variables
+
+Create a `terraform.tfvars` file with your actual values:
+
+```hcl
+vercel_api_token  = "your-vercel-api-token"
+vercel_team_id    = "your-team-id"
+github_repo       = "your-username/your-repo"
+supabase_url      = "https://your-project.supabase.co"
+supabase_anon_key = "your-supabase-anon-key"
+```
+
+<Warning>
+**Security**: Never commit `terraform.tfvars` to version control. Add it to `.gitignore`.
+</Warning>
+
+Alternatively, use environment variables:
+
+```bash
+export TF_VAR_vercel_api_token="your-token"
+export TF_VAR_vercel_team_id="your-team-id"
+export TF_VAR_supabase_url="https://your-project.supabase.co"
+export TF_VAR_supabase_anon_key="your-key"
+```
+
+### Plan Infrastructure
+
+Preview changes before applying:
+
+```bash
+# Generate and review execution plan
+terraform plan
+
+# Save plan to file for review
+terraform plan -out=tfplan
+
+# Review saved plan
+terraform show tfplan
+```
+
+The plan output shows:
+- Resources to be created (+)
+- Resources to be changed (~)
+- Resources to be destroyed (-)
+
+### Apply Configuration
+
+Provision the infrastructure:
+
+<CodeGroup>
+```bash Interactive Apply
+# Apply with confirmation prompt
+terraform apply
+
+# Review changes and type 'yes' to confirm
+```
+
+```bash Auto-approve
+# Apply without confirmation (CI/CD)
+terraform apply -auto-approve
+```
+
+```bash From Saved Plan
+# Apply previously saved plan
+terraform apply tfplan
+```
+</CodeGroup>
+
+Terraform will:
+1. Create two Vercel projects
+2. Configure GitHub integration
+3. Set environment variables
+4. Output project URLs
+
+### View Infrastructure State
+
+```bash
+# List all resources
+terraform state list
+
+# Show specific resource details
+terraform state show vercel_project.web
+
+# Show all outputs
+terraform output
+
+# Show specific output
+terraform output web_project_url
+```
+
+## Making Changes
+
+### Update Configuration
+
+Modify Terraform files as needed:
+
+```hcl
+# Example: Add a new environment variable
+resource "vercel_project_environment_variable" "web_api_url" {
+  project_id = vercel_project.web.id
+  team_id    = var.vercel_team_id
+  key        = "NEXT_PUBLIC_API_URL"
+  value      = "https://api.nexushotel.com"
+  target     = ["production"]
+}
+```
+
+Then apply changes:
+
+```bash
+terraform plan
+terraform apply
+```
+
+### Update Variables
+
+Change variable values in `terraform.tfvars`:
+
+```hcl
+# Update to new repository
+github_repo = "newuser/newrepo"
+```
+
+Apply the changes:
+
+```bash
+terraform apply
+```
+
+<Note>
+Changing certain properties (like project name) may require resource recreation.
+</Note>
+
+## Importing Existing Resources
+
+If you have existing Vercel projects, import them into Terraform:
+
+```bash
+# Import web project
+terraform import vercel_project.web prj_xxxxxxxxxxxxxxxxxxxx
+
+# Import API project
+terraform import vercel_project.api prj_yyyyyyyyyyyyyyyyyyyy
+```
+
+Find project IDs in Vercel dashboard or via API.
+
+## Destroying Infrastructure
+
+<Warning>
+**Destructive Operation**: This will delete Vercel projects and all associated data.
+</Warning>
+
+```bash
+# Preview what will be destroyed
+terraform plan -destroy
+
+# Destroy specific resource
+terraform destroy -target=vercel_project.api
+
+# Destroy all resources
+terraform destroy
+```
+
+## State Management
+
+### Local State
+
+By default, Terraform stores state in `terraform.tfstate`:
+
+```bash
+# View current state
+terraform show
+
+# Validate state
+terraform validate
+
+# Refresh state from real infrastructure
+terraform refresh
+```
+
+<Warning>
+Never manually edit `terraform.tfstate` or commit it to version control with sensitive data.
+</Warning>
+
+### Remote State (Recommended)
+
+For team collaboration, use remote state backend:
+
+```hcl
+# Add to provider.tf
+terraform {
+  backend "s3" {
+    bucket = "nexushotel-terraform-state"
+    key    = "vercel/terraform.tfstate"
+    region = "us-east-1"
+  }
+  
+  required_providers {
+    vercel = {
+      source  = "vercel/vercel"
+      version = "~> 1.0"
+    }
+  }
+}
+```
+
+Other backend options:
+- **Terraform Cloud**: Built-in remote state
+- **Azure Blob Storage**: For Azure environments
+- **GCS**: For Google Cloud environments
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml
+name: Terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Terraform Init
+        run: terraform init
+      
+      - name: Terraform Validate
+        run: terraform validate
+      
+      - name: Terraform Plan
+        run: terraform plan
+        env:
+          TF_VAR_vercel_api_token: ${{ secrets.VERCEL_API_TOKEN }}
+          TF_VAR_vercel_team_id: ${{ secrets.VERCEL_TEAM_ID }}
+          TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+          TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+      
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_vercel_api_token: ${{ secrets.VERCEL_API_TOKEN }}
+          TF_VAR_vercel_team_id: ${{ secrets.VERCEL_TEAM_ID }}
+          TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+          TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Version Control" icon="code-branch">
+    Commit Terraform files but never state files or secrets
+  </Card>
+  
+  <Card title="Remote State" icon="cloud">
+    Use remote backend for team collaboration and state locking
+  </Card>
+  
+  <Card title="Plan Before Apply" icon="list-check">
+    Always run `terraform plan` before `terraform apply`
+  </Card>
+  
+  <Card title="Variable Files" icon="file-code">
+    Use separate `.tfvars` files for different environments
+  </Card>
+</CardGroup>
+
+<Tip>
+**Pro Tips:**
+
+- Use workspaces for managing multiple environments
+- Implement state locking with remote backends
+- Use `terraform fmt` to format code consistently
+- Run `terraform validate` before committing changes
+- Tag resources for better organization and cost tracking
+- Use data sources to reference existing resources
+- Implement proper variable validation
+</Tip>
+
+## Troubleshooting
+
+### Provider Authentication Errors
+
+```bash
+# Verify API token is valid
+curl -H "Authorization: Bearer $VERCEL_API_TOKEN" \
+  https://api.vercel.com/v2/user
+
+# Check team access
+curl -H "Authorization: Bearer $VERCEL_API_TOKEN" \
+  https://api.vercel.com/v2/teams/$VERCEL_TEAM_ID
+```
+
+### State Lock Issues
+
+```bash
+# Force unlock if state is stuck (use with caution)
+terraform force-unlock <lock-id>
+
+# Or remove local state lock file
+rm .terraform.tfstate.lock.info
+```
+
+### Resource Already Exists
+
+```bash
+# Import existing resource instead of creating new
+terraform import vercel_project.web <project-id>
+```
+
+### Refresh State
+
+If state is out of sync:
+
+```bash
+# Refresh state from actual infrastructure
+terraform refresh
+
+# Or reconcile during plan
+terraform plan -refresh-only
+terraform apply -refresh-only
+```
+
+## Advanced Configuration
+
+### Adding Custom Domains
+
+```hcl
+resource "vercel_project_domain" "web_domain" {
+  project_id = vercel_project.web.id
+  team_id    = var.vercel_team_id
+  domain     = "app.nexushotel.com"
+}
+```
+
+### Configuring Build Settings
+
+```hcl
+resource "vercel_project" "web" {
+  name      = "hotel-project-web"
+  framework = "nextjs"
+  team_id   = var.vercel_team_id
+
+  git_repository = {
+    type = "github"
+    repo = var.github_repo
+  }
+
+  # Advanced build configuration
+  build_command       = "npx turbo run build --filter=web"
+  install_command     = "pnpm install --prefix=../.."
+  output_directory    = ".next"
+  node_version        = "18.x"
+  
+  # Environment-specific overrides
+  dev_command = "pnpm dev"
+  framework   = "nextjs"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker" icon="docker" href="/infrastructure/docker">
+    Learn about containerization setup
+  </Card>
+  
+  <Card title="CI/CD Pipeline" icon="rotate" href="/cicd/overview">
+    Automate deployments with CI/CD
+  </Card>
+</CardGroup>

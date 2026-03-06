@@ -1,0 +1,380 @@
+---
+title: Project Structure
+description: Complete directory structure and organization of the Nexus Hotel platform
+---
+
+## Overview
+
+Nexus Hotel is organized as a monorepo using **pnpm workspaces** and **Turbo** for efficient package management and build orchestration.
+
+## Root Directory Structure
+
+```
+proyecto-de-devops/
+├── apps/                    # Application workspaces
+├── packages/                # Shared packages and libraries
+├── helm/                    # Kubernetes Helm charts
+├── terraform/               # Infrastructure as Code
+├── k8s/                     # Raw Kubernetes manifests
+├── .github/                 # GitHub Actions workflows
+├── Dockerfile               # Production Docker image
+├── Dockerfile.dev           # Development Docker image
+├── compose.yaml             # Docker Compose configuration
+├── turbo.json               # Turbo build configuration
+├── pnpm-workspace.yaml      # pnpm workspace configuration
+├── package.json             # Root package configuration
+└── .env.example             # Environment variable template
+```
+
+## Application Directory (`apps/`)
+
+Contains the main applications of the platform.
+
+### apps/web
+
+Next.js frontend application for the hotel reservation system.
+
+```
+apps/web/
+├── app/                     # Next.js 13+ app directory
+├── components/              # React components
+├── public/                  # Static assets
+├── utils/                   # Utility functions
+├── package.json             # Web app dependencies
+├── next.config.js           # Next.js configuration
+└── tsconfig.json            # TypeScript configuration
+```
+
+**Key Details:**
+- **Framework:** Next.js 16.0.10
+- **Dev Port:** 3001
+- **Production Port:** 3000
+- **Dependencies:** React 19, Supabase client
+
+**Scripts:**
+```json
+{
+  "dev": "next dev --turbopack --port 3001",
+  "build": "next build",
+  "start": "next start",
+  "lint": "next lint --max-warnings 0",
+  "check-types": "tsc --noEmit"
+}
+```
+
+### apps/api
+
+Backend API application.
+
+```
+apps/api/
+├── src/                     # Source code
+├── dist/                    # Compiled output (generated)
+├── package.json             # API dependencies
+└── tsconfig.json            # TypeScript configuration
+```
+
+**Key Details:**
+- **Runtime:** Node.js with srvx
+- **Build Output:** `dist/`
+
+**Scripts:**
+```json
+{
+  "build": "tsc",
+  "dev": "srvx",
+  "start": "srvx dist/index.js"
+}
+```
+
+## Shared Packages (`packages/`)
+
+Reusable packages shared across applications.
+
+```
+packages/
+├── ui/                      # Shared UI components
+│   └── src/
+├── constants/               # Shared constants and config
+│   └── src/
+├── eslint-config/           # Shared ESLint configuration
+└── typescript-config/       # Shared TypeScript configurations
+```
+
+### packages/ui
+
+Shared React components used across applications.
+
+```
+packages/ui/
+├── src/
+│   ├── button.tsx
+│   ├── card.tsx
+│   └── index.ts
+├── package.json
+└── tsconfig.json
+```
+
+### packages/constants
+
+Shared constants, types, and configuration.
+
+```
+packages/constants/
+├── src/
+│   └── index.ts
+├── package.json
+└── tsconfig.json
+```
+
+### packages/eslint-config
+
+Shared ESLint rules for code consistency.
+
+### packages/typescript-config
+
+Shared TypeScript compiler configurations.
+
+## Kubernetes Configuration (`helm/`)
+
+Helm chart for Kubernetes deployment.
+
+```
+helm/
+├── templates/
+│   ├── deployment.yaml      # Pod deployment configuration
+│   ├── service.yaml         # Service exposure
+│   ├── ingress.yaml         # External access configuration
+│   ├── namespace.yaml       # Namespace definition
+│   └── _helpers.tpl         # Template helpers
+├── Chart.yaml               # Chart metadata
+└── values.yaml              # Default configuration values
+```
+
+**Key Resources:**
+- **Namespace:** `nexushotel`
+- **Replicas:** 3 (high availability)
+- **Service Type:** ClusterIP
+- **Ingress Controller:** nginx
+- **Default Host:** `nexushotel.local`
+
+## Raw Kubernetes Manifests (`k8s/`)
+
+Direct Kubernetes YAML files (alternative to Helm).
+
+```
+k8s/
+├── deployment.yaml          # Deployment manifest
+├── service.yaml             # Service manifest
+├── ingress.yaml             # Ingress manifest
+└── namespace.yaml           # Namespace manifest
+```
+
+## Infrastructure as Code (`terraform/`)
+
+Terraform configuration for cloud infrastructure provisioning.
+
+```
+terraform/
+├── main.tf                  # Main resource definitions
+├── provider.tf              # Provider configuration
+├── variables.tf             # Input variables
+├── terraform.tfstate        # State file (generated, not committed)
+└── .terraform/              # Provider plugins (generated)
+```
+
+**Resources Managed:**
+- Vercel projects (`hotel-project-web`, `hotel-project-api`)
+- Environment variables (Supabase integration)
+- Git repository connections
+
+## CI/CD Configuration (`.github/`)
+
+GitHub Actions workflows for automation.
+
+```
+.github/
+└── workflows/
+    └── cd.yml               # Continuous Deployment workflow
+```
+
+**CD Workflow Triggers:**
+- Pull request merge to `main` or `master`
+- Automatic Helm deployment to Kubernetes
+
+## Docker Configuration Files
+
+### Dockerfile (Production)
+
+**Purpose:** Multi-stage production build  
+**Image Size:** Optimized with minimal dependencies  
+**Base:** `node:22-slim`
+
+**Stages:**
+1. `base` - pnpm setup
+2. `builder` - Turbo workspace pruning
+3. `installer` - Dependency installation and build
+4. `runner` - Minimal runtime image
+
+### Dockerfile.dev (Development)
+
+**Purpose:** Development with hot-reload  
+**Image Size:** Full development tools included  
+**Base:** `node:22-slim`
+
+### compose.yaml
+
+**Purpose:** Local Docker orchestration  
+**Services:** Single `api` service running production build
+
+## Configuration Files
+
+### Root Configuration
+
+| File | Purpose |
+|------|----------|
+| `package.json` | Root workspace configuration and scripts |
+| `pnpm-workspace.yaml` | Defines workspace packages |
+| `turbo.json` | Turbo build pipeline configuration |
+| `.env.example` | Environment variable template |
+| `.gitignore` | Git ignore patterns |
+| `.dockerignore` | Docker build ignore patterns |
+| `.npmrc` | npm/pnpm configuration |
+
+### turbo.json
+
+Defines build tasks and caching strategy:
+
+```json
+{
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", ".vercel/output/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+### pnpm-workspace.yaml
+
+Defines workspace packages:
+
+```yaml
+packages:
+  - 'apps/*'
+  - 'packages/*'
+```
+
+## Build Artifacts (Generated)
+
+These directories are generated during builds and not committed to Git:
+
+```
+# Application builds
+apps/web/.next/              # Next.js build output
+apps/web/.vercel/            # Vercel deployment config
+apps/api/dist/               # Compiled TypeScript
+
+# Dependencies
+node_modules/                # npm packages
+.pnpm-store/                 # pnpm cache
+
+# Terraform
+terraform/.terraform/        # Provider plugins
+terraform/terraform.tfstate  # State file
+terraform/*.tfvars           # Variable values (sensitive)
+
+# Docker
+.docker/                     # Docker cache
+```
+
+## Environment Files
+
+```
+.env.example                 # Template (committed)
+.env                         # Local dev (gitignored)
+.env.local                   # Local overrides (gitignored)
+.env.production              # Production config (gitignored)
+```
+
+## Workspace Dependencies
+
+### Internal Package References
+
+Applications reference shared packages using `workspace:*` protocol:
+
+```json
+// apps/web/package.json
+{
+  "dependencies": {
+    "@repo/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*"
+  }
+}
+```
+
+## Technology Stack Overview
+
+| Component | Technology | Version |
+|-----------|-----------|----------|
+| **Package Manager** | pnpm | 10.28.2 |
+| **Build System** | Turbo | 2.5.5 |
+| **Node Runtime** | Node.js | 22.x |
+| **Frontend Framework** | Next.js | 16.0.10 |
+| **Frontend Library** | React | 19.2.1 |
+| **Language** | TypeScript | 5.8.3 |
+| **Database** | Supabase | - |
+| **Container Runtime** | Docker | - |
+| **Orchestration** | Kubernetes | - |
+| **Package Manager** | Helm | - |
+| **IaC** | Terraform | - |
+| **Deployment** | Vercel | - |
+
+## Port Allocation
+
+| Service | Port | Environment | Protocol |
+|---------|------|-------------|----------|
+| Web (dev) | 3001 | Development | HTTP |
+| Web (prod) | 3000 | Production | HTTP |
+| Container (dev) | 3001 | Docker Dev | HTTP |
+| Container (prod) | 3000 | Docker Prod | HTTP |
+| K8s Service | 80 | Kubernetes | HTTP |
+| K8s Container | 3000 | Kubernetes | HTTP |
+
+## Best Practices
+
+<Check>
+  Run commands from the repository root using workspace filters
+</Check>
+
+<Check>
+  Use `pnpm --filter <workspace>` for workspace-specific commands
+</Check>
+
+<Check>
+  Leverage Turbo's caching for faster builds
+</Check>
+
+<Check>
+  Keep shared code in `packages/` for reusability
+</Check>
+
+<Warning>
+  Never commit `node_modules/`, `.env`, or Terraform state files
+</Warning>
+
+## Related Documentation
+
+- [Docker Reference](/reference/docker-reference)
+- [Helm Values](/reference/helm-values)
+- [Terraform Variables](/reference/terraform-variables)
+- [Commands Reference](/reference/commands)
+- [Tech Stack Details](/reference/tech-stack)

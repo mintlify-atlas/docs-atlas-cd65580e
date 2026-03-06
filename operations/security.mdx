@@ -1,0 +1,442 @@
+---
+title: Security Practices
+description: Security practices, secrets management, and authentication for Nexus Hotel platform
+---
+
+# Security Practices
+
+Security is a critical priority for the Nexus Hotel platform, which handles sensitive customer information including personal data, contact details, lodging preferences, and banking information.
+
+## Security Architecture
+
+The platform implements multiple layers of security:
+
+- **Authentication & Authorization**: Supabase authentication
+- **Secrets Management**: Kubernetes Secrets and GitHub Actions Secrets
+- **Network Security**: Kubernetes network policies and Ingress controls
+- **Infrastructure Security**: Infrastructure as Code with Terraform
+- **Continuous Security**: Automated vulnerability scanning in CI/CD
+
+---
+
+## Authentication with Supabase
+
+**Supabase** provides the authentication and database backend for the Nexus Hotel platform.
+
+### Supabase Configuration
+
+The platform uses Supabase for:
+- **User Authentication**: Secure login and registration
+- **Database Management**: PostgreSQL database with Row Level Security (RLS)
+- **API Authentication**: Automatic JWT token management
+
+### Environment Variables
+
+Supabase requires the following environment variables:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+```
+
+<Warning>
+**Critical**: Never commit Supabase credentials to version control. Always use:
+- `.env` files for local development (excluded from git)
+- Kubernetes Secrets for cluster deployments
+- GitHub Secrets for CI/CD pipelines
+- Terraform for automated environment variable management
+</Warning>
+
+### Supabase Security Best Practices
+
+- **Enable Row Level Security (RLS)**: Ensure all tables have RLS policies
+- **Use Service Role Key Carefully**: Only use service role key on backend, never in frontend
+- **Implement Proper Authorization**: Validate user permissions before data access
+- **Enable MFA**: Encourage multi-factor authentication for users
+- **Monitor Auth Logs**: Track failed login attempts and suspicious activity
+- **Rotate API Keys**: Regularly rotate Supabase API keys
+
+---
+
+## Secrets Management
+
+### Kubernetes Secrets
+
+For production deployments, store sensitive data in Kubernetes Secrets:
+
+```bash
+# Create a secret for Supabase credentials
+kubectl create secret generic supabase-credentials \
+  --from-literal=url=<your-supabase-url> \
+  --from-literal=anon-key=<your-supabase-anon-key> \
+  -n nexushotel
+
+# Verify secret creation
+kubectl get secrets -n nexushotel
+
+# View secret details (base64 encoded)
+kubectl describe secret supabase-credentials -n nexushotel
+```
+
+### Using Secrets in Deployments
+
+Reference secrets in your Kubernetes deployments:
+
+```yaml
+env:
+  - name: NEXT_PUBLIC_SUPABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: supabase-credentials
+        key: url
+  - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+    valueFrom:
+      secretKeyRef:
+        name: supabase-credentials
+        key: anon-key
+```
+
+### GitHub Actions Secrets
+
+For CI/CD pipelines, configure these secrets in GitHub:
+
+**Required Secrets:**
+- `KUBECONFIG`: Kubernetes cluster credentials
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_ANON_KEY`: Supabase anonymous key
+- `DOCKER_HUB_TOKEN`: Docker Hub authentication (if using private registry)
+
+**Configuration Location:**  
+Repository → Settings → Secrets and variables → Actions
+
+<Warning>
+GitHub Secrets are encrypted and never exposed in logs. Ensure you:
+- Use separate secrets for different environments (dev, staging, prod)
+- Limit repository access to authorized team members only
+- Rotate secrets regularly (at least every 90 days)
+- Never print secrets in workflow logs or commands
+</Warning>
+
+### Terraform Secrets Management
+
+Terraform automatically synchronizes environment variables to Vercel projects:
+
+```hcl
+# From terraform/main.tf
+resource "vercel_project_environment_variable" "web_url" {
+  project_id = vercel_project.web.id
+  key        = "NEXT_PUBLIC_SUPABASE_URL"
+  value      = var.supabase_url
+  target     = ["production", "preview", "development"]
+}
+```
+
+**Terraform Security Best Practices:**
+- Store Terraform state remotely (S3, Terraform Cloud)
+- Encrypt state files at rest
+- Use variable files for sensitive values, never hardcode
+- Review `terraform plan` output before applying
+- Use `terraform.tfvars` for local values (excluded from git)
+
+---
+
+## Network Security
+
+### Ingress Configuration
+
+The platform uses nginx Ingress Controller with the following configuration:
+
+```yaml
+# From helm/values.yaml
+ingress:
+  enabled: true
+  className: nginx
+  host: nexushotel.local
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+```
+
+### Network Security Best Practices
+
+<Warning>
+**Production Security Requirements:**
+- Always use HTTPS/TLS for external traffic
+- Configure valid SSL certificates (Let's Encrypt or commercial)
+- Enable HSTS (HTTP Strict Transport Security)
+- Implement rate limiting to prevent DDoS attacks
+- Use Web Application Firewall (WAF) rules
+- Restrict ingress to trusted IP ranges where applicable
+</Warning>
+
+### TLS/SSL Configuration
+
+For production deployments, configure TLS:
+
+```bash
+# Create TLS secret from certificate files
+kubectl create secret tls nexushotel-tls \
+  --cert=path/to/tls.crt \
+  --key=path/to/tls.key \
+  -n nexushotel
+```
+
+Update Ingress to use TLS:
+
+```yaml
+ingress:
+  tls:
+    - hosts:
+        - nexushotel.com
+      secretName: nexushotel-tls
+```
+
+---
+
+## Container Security
+
+### Docker Image Security
+
+The platform uses secure Docker practices:
+
+**Base Image:** `node:22-slim` - Minimal attack surface  
+**Multi-stage Build:** Separates build and runtime environments  
+**Image Registry:** `ssubaru/nexushotel:latest`
+
+### Container Security Best Practices
+
+<Warning>
+**Critical Container Security Measures:**
+- Use official, minimal base images (slim, alpine)
+- Scan images for vulnerabilities before deployment
+- Never run containers as root user
+- Remove unnecessary tools and packages from production images
+- Keep base images updated with security patches
+- Sign and verify container images
+- Use private registries for sensitive applications
+</Warning>
+
+### Image Scanning
+
+Scan Docker images for vulnerabilities:
+
+```bash
+# Using Docker Scout (built into Docker)
+docker scout cves ssubaru/nexushotel:latest
+
+# Using Trivy
+trivy image ssubaru/nexushotel:latest
+```
+
+---
+
+## Access Control
+
+### Kubernetes RBAC
+
+Implement Role-Based Access Control:
+
+```bash
+# Create a read-only role for developers
+kubectl create role pod-reader \
+  --verb=get,list,watch \
+  --resource=pods,logs \
+  -n nexushotel
+
+# Bind role to a user or service account
+kubectl create rolebinding pod-reader-binding \
+  --role=pod-reader \
+  --user=developer@example.com \
+  -n nexushotel
+```
+
+### Access Control Best Practices
+
+- **Principle of Least Privilege**: Grant minimum required permissions
+- **Separate Service Accounts**: Use different accounts for different services
+- **Namespace Isolation**: Keep production isolated from dev/staging
+- **Audit Logging**: Enable and monitor Kubernetes audit logs
+- **Regular Access Review**: Periodically review and revoke unnecessary access
+
+---
+
+## DevOps Security Practices
+
+### Continuous Security
+
+The DevOps methodology enables continuous security improvements:
+
+**Automated Security Testing:**
+- Vulnerability scanning in CI pipeline
+- Dependency security audits
+- Static code analysis (SAST)
+- Dynamic application security testing (DAST)
+
+**Security in CI/CD:**
+```bash
+# Add to CI pipeline
+# Scan dependencies for vulnerabilities
+npm audit
+pnpm audit
+
+# Scan Docker image
+trivy image nexushotel:latest
+
+# Run security linting
+npm run lint:security
+```
+
+### Dependency Management
+
+<Warning>
+**Dependency Security:**
+- Regularly update dependencies to patch vulnerabilities
+- Use lock files (pnpm-lock.yaml) to ensure consistent versions
+- Review dependency licenses for compliance
+- Minimize dependency count to reduce attack surface
+- Use tools like Dependabot for automated updates
+</Warning>
+
+```bash
+# Check for outdated packages
+pnpm outdated
+
+# Update dependencies
+pnpm update
+
+# Audit for security vulnerabilities
+pnpm audit
+```
+
+---
+
+## Data Protection
+
+### Sensitive Data Handling
+
+The platform handles multiple types of sensitive data:
+
+- **Personal Information**: Names, addresses, contact details
+- **Banking Information**: Payment card data, transaction records
+- **Lodging Preferences**: Reservation history, preferences
+- **Authentication Data**: Passwords, tokens, sessions
+
+### Data Protection Best Practices
+
+<Warning>
+**Critical Data Protection Measures:**
+- Encrypt data at rest and in transit
+- Use Supabase Row Level Security (RLS) for database access control
+- Implement proper input validation and sanitization
+- Never log sensitive information (passwords, credit cards, tokens)
+- Use secure session management
+- Implement PCI DSS compliance for payment data
+- Regular security audits and penetration testing
+- Data retention and deletion policies
+</Warning>
+
+### Database Security (Supabase)
+
+```sql
+-- Example: Enable Row Level Security
+ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
+
+-- Create policy for user data access
+CREATE POLICY "Users can view own reservations"
+  ON reservations
+  FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Create policy for user data modification
+CREATE POLICY "Users can update own reservations"
+  ON reservations
+  FOR UPDATE
+  USING (auth.uid() = user_id);
+```
+
+---
+
+## Security Monitoring
+
+### Security Metrics to Track
+
+- Failed authentication attempts
+- Unusual API access patterns
+- Database query anomalies
+- Container security scan results
+- Certificate expiration dates
+- Secrets rotation status
+
+### Security Logging
+
+```bash
+# Monitor authentication logs
+kubectl logs -n nexushotel -l app=nexushotel-web | grep "auth"
+
+# Check for security-related events
+kubectl get events -n nexushotel --field-selector type=Warning
+
+# Monitor failed requests
+kubectl logs -n nexushotel -l app=nexushotel-web | grep "401\|403"
+```
+
+---
+
+## Incident Response
+
+### Security Incident Workflow
+
+1. **Detection**: Monitor alerts and logs for security events
+2. **Containment**: Isolate affected systems immediately
+3. **Investigation**: Analyze logs and identify breach scope
+4. **Eradication**: Remove threat and patch vulnerabilities
+5. **Recovery**: Restore systems and verify security
+6. **Post-Incident**: Document lessons learned and improve processes
+
+### Emergency Procedures
+
+In case of a security breach:
+
+```bash
+# Immediately rotate all secrets
+kubectl delete secret supabase-credentials -n nexushotel
+kubectl create secret generic supabase-credentials \
+  --from-literal=url=<new-url> \
+  --from-literal=anon-key=<new-key> \
+  -n nexushotel
+
+# Scale down affected pods
+kubectl scale deployment nexushotel-web --replicas=0 -n nexushotel
+
+# Review recent access
+kubectl get events -n nexushotel --sort-by='.lastTimestamp'
+
+# Collect forensic logs
+kubectl logs -n nexushotel -l app=nexushotel-web --previous > incident-logs.txt
+```
+
+---
+
+## Security Checklist
+
+### Pre-Deployment Security Review
+
+- [ ] All secrets stored in Kubernetes Secrets or GitHub Actions Secrets
+- [ ] No credentials committed to version control
+- [ ] Docker images scanned for vulnerabilities
+- [ ] Dependencies updated and audited
+- [ ] TLS/SSL certificates configured
+- [ ] Supabase Row Level Security enabled
+- [ ] RBAC policies configured
+- [ ] Network policies defined
+- [ ] Rate limiting configured on Ingress
+- [ ] Monitoring and alerting set up
+
+### Regular Security Maintenance
+
+- [ ] Rotate secrets every 90 days
+- [ ] Update dependencies monthly
+- [ ] Review access permissions quarterly
+- [ ] Conduct security audits semi-annually
+- [ ] Test incident response procedures
+- [ ] Review and update security policies
+- [ ] Train team on security best practices

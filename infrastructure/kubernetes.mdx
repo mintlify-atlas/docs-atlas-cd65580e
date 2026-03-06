@@ -1,0 +1,419 @@
+---
+title: 'Kubernetes Deployment'
+description: 'Kubernetes manifests and deployment configuration for Nexus Hotel platform'
+---
+
+## Overview
+
+The Nexus Hotel platform includes Kubernetes manifests for deploying the web application to a Kubernetes cluster. The configuration includes namespace isolation, deployment with resource limits, service exposure, and ingress routing.
+
+## Architecture
+
+The Kubernetes deployment consists of four main components:
+
+<CardGroup cols={2}>
+  <Card title="Namespace" icon="folder">
+    Isolated namespace `nexushotel` for resource organization
+  </Card>
+  
+  <Card title="Deployment" icon="server">
+    3 replicas of the web application with resource constraints
+  </Card>
+  
+  <Card title="Service" icon="network-wired">
+    ClusterIP service exposing the application internally
+  </Card>
+  
+  <Card title="Ingress" icon="globe">
+    NGINX ingress controller for external traffic routing
+  </Card>
+</CardGroup>
+
+## Manifests
+
+### Namespace
+
+The namespace manifest (`k8s/namespace.yaml`) creates an isolated environment:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexushotel
+  labels:
+    name: nexushotel
+```
+
+### Deployment
+
+The deployment manifest (`k8s/deployment.yaml`) defines the application pods:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexushotel-web
+  namespace: nexushotel
+  labels:
+    app: nexushotel-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nexushotel-web
+  template:
+    metadata:
+      labels:
+        app: nexushotel-web
+    spec:
+      containers:
+        - name: web
+          image: nexushotel-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+```
+
+**Key Configuration:**
+
+- **Replicas**: 3 pods for high availability
+- **Image**: `nexushotel-web:latest` (update with your registry)
+- **Resources**: 256Mi-512Mi memory, 100m-500m CPU
+- **Port**: Container listens on port 3000
+
+### Service
+
+The service manifest (`k8s/service.yaml`) exposes the deployment internally:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexushotel-web-svc
+  namespace: nexushotel
+  labels:
+    app: nexushotel-web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http
+  selector:
+    app: nexushotel-web
+```
+
+**Service Configuration:**
+
+- **Type**: ClusterIP (internal only)
+- **Port Mapping**: External port 80 → Container port 3000
+- **Selector**: Routes traffic to pods with label `app: nexushotel-web`
+
+### Ingress
+
+The ingress manifest (`k8s/ingress.yaml`) configures external access:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexushotel-ingress
+  namespace: nexushotel
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: nexushotel.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nexushotel-web-svc
+                port:
+                  number: 80
+```
+
+<Warning>
+**Domain Configuration**: Change `nexushotel.local` to your actual domain in production.
+</Warning>
+
+## Deployment
+
+### Prerequisites
+
+Before deploying, ensure you have:
+
+<Steps>
+  <Step title="Kubernetes Cluster">
+    A running Kubernetes cluster (local or cloud-based)
+  </Step>
+  
+  <Step title="kubectl CLI">
+    kubectl installed and configured to access your cluster
+  </Step>
+  
+  <Step title="NGINX Ingress Controller">
+    NGINX Ingress Controller installed in your cluster
+  </Step>
+  
+  <Step title="Docker Image">
+    Built Docker image available in a registry accessible by the cluster
+  </Step>
+</Steps>
+
+### Deploy to Kubernetes
+
+<Tabs>
+  <Tab title="All Resources">
+    Deploy all resources at once:
+    
+    ```bash
+    # Apply all manifests
+    kubectl apply -f k8s/
+    ```
+    
+    This will create the namespace, deployment, service, and ingress in order.
+  </Tab>
+  
+  <Tab title="Step by Step">
+    Deploy resources individually:
+    
+    ```bash
+    # Create namespace
+    kubectl apply -f k8s/namespace.yaml
+    
+    # Deploy application
+    kubectl apply -f k8s/deployment.yaml
+    
+    # Create service
+    kubectl apply -f k8s/service.yaml
+    
+    # Configure ingress
+    kubectl apply -f k8s/ingress.yaml
+    ```
+  </Tab>
+</Tabs>
+
+### Verify Deployment
+
+Check the status of your deployment:
+
+```bash
+# Check namespace
+kubectl get namespace nexushotel
+
+# Check deployment status
+kubectl get deployment -n nexushotel
+
+# Check pods
+kubectl get pods -n nexushotel
+
+# Check service
+kubectl get service -n nexushotel
+
+# Check ingress
+kubectl get ingress -n nexushotel
+```
+
+<Tip>
+Use `kubectl describe` for detailed information about any resource:
+
+```bash
+kubectl describe deployment nexushotel-web -n nexushotel
+```
+</Tip>
+
+## Resource Management
+
+### Resource Requests and Limits
+
+The deployment specifies resource constraints for each pod:
+
+<ParamField path="requests.memory" type="string" default="256Mi">
+  Minimum memory guaranteed for each pod
+</ParamField>
+
+<ParamField path="requests.cpu" type="string" default="100m">
+  Minimum CPU guaranteed for each pod (0.1 CPU cores)
+</ParamField>
+
+<ParamField path="limits.memory" type="string" default="512Mi">
+  Maximum memory each pod can use before being killed
+</ParamField>
+
+<ParamField path="limits.cpu" type="string" default="500m">
+  Maximum CPU each pod can use (0.5 CPU cores)
+</ParamField>
+
+### Scaling
+
+<CodeGroup>
+```bash Manual Scaling
+# Scale to 5 replicas
+kubectl scale deployment nexushotel-web -n nexushotel --replicas=5
+
+# Scale down to 1 replica
+kubectl scale deployment nexushotel-web -n nexushotel --replicas=1
+```
+
+```bash Auto-scaling
+# Create horizontal pod autoscaler
+kubectl autoscale deployment nexushotel-web \
+  -n nexushotel \
+  --cpu-percent=70 \
+  --min=3 \
+  --max=10
+```
+</CodeGroup>
+
+## Monitoring and Debugging
+
+### View Logs
+
+```bash
+# Get logs from all pods
+kubectl logs -n nexushotel -l app=nexushotel-web
+
+# Follow logs from a specific pod
+kubectl logs -n nexushotel -f <pod-name>
+
+# Get logs from previous container instance (if crashed)
+kubectl logs -n nexushotel <pod-name> --previous
+```
+
+### Access Pod Shell
+
+```bash
+# Execute shell in a running pod
+kubectl exec -it -n nexushotel <pod-name> -- /bin/sh
+
+# Run a command in a pod
+kubectl exec -n nexushotel <pod-name> -- env
+```
+
+### Port Forwarding
+
+Access the application locally without ingress:
+
+```bash
+# Forward local port 8080 to service port 80
+kubectl port-forward -n nexushotel service/nexushotel-web-svc 8080:80
+
+# Access at http://localhost:8080
+```
+
+## Updating the Application
+
+### Rolling Update
+
+Update the application with zero downtime:
+
+```bash
+# Update image to a new version
+kubectl set image deployment/nexushotel-web \
+  -n nexushotel \
+  web=nexushotel-web:v2.0.0
+
+# Check rollout status
+kubectl rollout status deployment/nexushotel-web -n nexushotel
+
+# View rollout history
+kubectl rollout history deployment/nexushotel-web -n nexushotel
+```
+
+### Rollback
+
+Revert to a previous version if issues occur:
+
+```bash
+# Rollback to previous version
+kubectl rollout undo deployment/nexushotel-web -n nexushotel
+
+# Rollback to specific revision
+kubectl rollout undo deployment/nexushotel-web -n nexushotel --to-revision=2
+```
+
+## Configuration Updates
+
+To update environment variables or other configuration:
+
+```bash
+# Edit deployment directly
+kubectl edit deployment nexushotel-web -n nexushotel
+
+# Or update the YAML file and reapply
+kubectl apply -f k8s/deployment.yaml
+```
+
+<Note>
+Changing the deployment configuration will trigger a rolling update automatically.
+</Note>
+
+## Production Considerations
+
+<Warning>
+**Before deploying to production:**
+
+1. **Update Image Repository**: Change `nexushotel-web:latest` to your actual container registry
+2. **Configure Domain**: Update `nexushotel.local` in ingress to your production domain
+3. **TLS/SSL**: Add TLS configuration to the ingress for HTTPS
+4. **Secrets Management**: Use Kubernetes Secrets for sensitive data
+5. **Resource Limits**: Adjust CPU and memory based on load testing
+6. **Health Checks**: Add liveness and readiness probes to the deployment
+</Warning>
+
+### Adding TLS
+
+To enable HTTPS, update the ingress with TLS configuration:
+
+```yaml
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - nexushotel.com
+      secretName: nexushotel-tls
+  rules:
+    - host: nexushotel.com
+      # ...
+```
+
+## Cleanup
+
+Remove all resources:
+
+```bash
+# Delete all resources in namespace
+kubectl delete -f k8s/
+
+# Or delete the entire namespace
+kubectl delete namespace nexushotel
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Helm Charts" icon="ship" href="/infrastructure/helm">
+    Simplify deployments with Helm templating
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/infrastructure/docker">
+    Learn about building the container images
+  </Card>
+</CardGroup>

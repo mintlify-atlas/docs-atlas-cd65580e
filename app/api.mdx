@@ -1,0 +1,388 @@
+---
+title: API Service
+description: Hono.js API service for the Nexus Hotel DevOps Platform
+---
+
+The API is a lightweight backend service built with Hono.js, located in `apps/api/`.
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="Hono.js" icon="fire">
+    Fast, lightweight web framework
+  </Card>
+  <Card title="TypeScript" icon="code">
+    Type-safe API development
+  </Card>
+  <Card title="srvx" icon="bolt">
+    Development server with hot reload
+  </Card>
+  <Card title="Shared Constants" icon="link">
+    Uses monorepo shared packages
+  </Card>
+</CardGroup>
+
+## Package Configuration
+
+From `apps/api/package.json`:
+
+```json apps/api/package.json
+{
+  "name": "api",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "srvx",
+    "start": "srvx dist/index.js"
+  },
+  "dependencies": {
+    "@repo/constants": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "srvx": "^0.8.7",
+    "typescript": "^5.8.3"
+  }
+}
+```
+
+## Application Structure
+
+```
+apps/api/
+├── src/
+│   └── index.ts          # Main API entry point
+├── dist/                 # Compiled JavaScript output
+├── package.json          # Package dependencies
+└── tsconfig.json         # TypeScript configuration
+```
+
+## API Implementation
+
+The main API file (`apps/api/src/index.ts`) is minimal:
+
+```typescript apps/api/src/index.ts
+import { CONSTANT } from '@repo/constants'
+
+export default {
+  fetch: () => new Response(CONSTANT)
+}
+```
+
+<Note>
+  This simple implementation follows the Web Standard `fetch` API pattern, making it compatible with various JavaScript runtimes (Bun, Deno, Cloudflare Workers, Node.js).
+</Note>
+
+## Key Features
+
+### Runtime Agnostic
+
+The API uses the standard `fetch` handler interface:
+
+```typescript
+export default {
+  fetch: (request: Request) => Response | Promise<Response>
+}
+```
+
+This makes it compatible with:
+- Bun
+- Deno
+- Cloudflare Workers
+- Node.js (with adapter)
+
+### Shared Constants
+
+Imports from the monorepo's shared constants package:
+
+```typescript
+import { CONSTANT } from '@repo/constants'
+```
+
+**Constant value** (from `packages/constants/src/constants.ts`):
+
+```typescript packages/constants/src/constants.ts
+export const CONSTANT = 'Hello from your Hono API!'
+```
+
+## Development
+
+### Running the API
+
+<Tabs>
+  <Tab title="Development">
+    Start the development server with hot reload:
+    
+    ```bash
+    pnpm dev
+    ```
+    
+    This runs `srvx` which watches for file changes.
+  </Tab>
+  
+  <Tab title="Build">
+    Compile TypeScript to JavaScript:
+    
+    ```bash
+    pnpm build
+    ```
+    
+    Output goes to the `dist/` directory.
+  </Tab>
+  
+  <Tab title="Production">
+    Start the production server:
+    
+    ```bash
+    pnpm start
+    ```
+    
+    Runs the compiled code from `dist/index.js`.
+  </Tab>
+</Tabs>
+
+### Development Workflow
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+  
+  <Step title="Start Dev Server">
+    ```bash
+    cd apps/api
+    pnpm dev
+    ```
+    
+    Or from the root:
+    ```bash
+    pnpm dev
+    ```
+  </Step>
+  
+  <Step title="Make Changes">
+    Edit `src/index.ts` and the server will automatically reload.
+  </Step>
+  
+  <Step title="Build for Production">
+    ```bash
+    pnpm build
+    ```
+  </Step>
+</Steps>
+
+## TypeScript Configuration
+
+The API uses TypeScript 5.8.3 with ESM modules:
+
+```json apps/api/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+## API Response
+
+Currently, the API returns a simple text response:
+
+**Request:**
+```bash
+curl http://localhost:8787
+```
+
+**Response:**
+```
+Hello from your Hono API!
+```
+
+## Extending the API
+
+To add more endpoints, you can expand the API using Hono's routing:
+
+<Tabs>
+  <Tab title="Basic Route">
+    ```typescript
+    import { Hono } from 'hono'
+    import { CONSTANT } from '@repo/constants'
+    
+    const app = new Hono()
+    
+    app.get('/', (c) => c.text(CONSTANT))
+    app.get('/health', (c) => c.json({ status: 'ok' }))
+    
+    export default app
+    ```
+  </Tab>
+  
+  <Tab title="With Params">
+    ```typescript
+    import { Hono } from 'hono'
+    
+    const app = new Hono()
+    
+    app.get('/rooms/:id', (c) => {
+      const id = c.req.param('id')
+      return c.json({ roomId: id })
+    })
+    
+    export default app
+    ```
+  </Tab>
+  
+  <Tab title="POST Endpoint">
+    ```typescript
+    import { Hono } from 'hono'
+    
+    const app = new Hono()
+    
+    app.post('/bookings', async (c) => {
+      const body = await c.req.json()
+      // Process booking
+      return c.json({ success: true, booking: body })
+    })
+    
+    export default app
+    ```
+  </Tab>
+</Tabs>
+
+## Integration with Frontend
+
+The API can be called from the Next.js frontend:
+
+```typescript
+// In a React component or API route
+const response = await fetch('http://localhost:8787')
+const data = await response.text()
+console.log(data) // "Hello from your Hono API!"
+```
+
+## Environment Variables
+
+For environment-specific configuration, create a `.env` file:
+
+```bash .env
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://...
+SUPABASE_KEY=...
+```
+
+Access in code:
+
+```typescript
+const databaseUrl = process.env.DATABASE_URL
+```
+
+## Deployment Targets
+
+The API can be deployed to:
+
+<CardGroup cols={3}>
+  <Card title="Cloudflare Workers" icon="cloud">
+    Serverless edge computing
+  </Card>
+  <Card title="Vercel" icon="triangle">
+    Serverless functions
+  </Card>
+  <Card title="Railway" icon="train">
+    Containerized deployment
+  </Card>
+  <Card title="Fly.io" icon="plane">
+    Distributed applications
+  </Card>
+  <Card title="Bun" icon="bread-slice">
+    Fast JavaScript runtime
+  </Card>
+  <Card title="Node.js" icon="node-js">
+    Traditional hosting
+  </Card>
+</CardGroup>
+
+## Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| @repo/constants | workspace:* | Shared constants from monorepo |
+| @types/node | ^20.11.17 | Node.js type definitions |
+| srvx | ^0.8.7 | Development server |
+| typescript | ^5.8.3 | TypeScript compiler |
+
+## srvx Development Server
+
+`srvx` is a lightweight development server that:
+- Watches for file changes
+- Automatically recompiles TypeScript
+- Restarts the server on changes
+- Provides fast feedback loop
+
+## Future Enhancements
+
+<AccordionGroup>
+  <Accordion title="Database Integration">
+    Add Supabase or PostgreSQL for data persistence:
+    ```typescript
+    import { createClient } from '@supabase/supabase-js'
+    
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_KEY
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="API Routes">
+    Create RESTful endpoints for:
+    - Room bookings
+    - Restaurant reservations
+    - User management
+    - Payment processing
+  </Accordion>
+  
+  <Accordion title="Authentication">
+    Add JWT or session-based authentication:
+    ```typescript
+    import { jwt } from 'hono/jwt'
+    
+    app.use('/api/*', jwt({ secret: process.env.JWT_SECRET }))
+    ```
+  </Accordion>
+  
+  <Accordion title="Validation">
+    Add request validation with Zod:
+    ```typescript
+    import { z } from 'zod'
+    
+    const bookingSchema = z.object({
+      roomId: z.string(),
+      checkIn: z.string().datetime(),
+      checkOut: z.string().datetime(),
+    })
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={3}>
+  <Card title="Frontend" icon="react" href="/app/frontend">
+    Next.js application
+  </Card>
+  <Card title="Shared Packages" icon="box" href="/app/shared-packages">
+    Monorepo packages
+  </Card>
+  <Card title="Database" icon="database" href="/app/database">
+    Supabase integration
+  </Card>
+</CardGroup>

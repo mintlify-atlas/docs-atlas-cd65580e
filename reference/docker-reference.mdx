@@ -1,0 +1,257 @@
+---
+title: Docker Reference
+description: Complete Docker command reference for Nexus Hotel platform
+---
+
+## Overview
+
+Nexus Hotel uses Docker for containerization across development and production environments. Two distinct Dockerfiles serve different purposes in the development lifecycle.
+
+## Docker Images
+
+### Production Image
+
+<ParamField path="image" type="string" default="ssubaru/nexushotel:latest">
+  Official production image hosted on Docker Hub
+</ParamField>
+
+<ParamField path="base" type="string" default="node:22-slim">
+  Base image used for all build stages
+</ParamField>
+
+### Dockerfile (Production)
+
+**File:** `Dockerfile`  
+**Port:** `3000`  
+**Build Strategy:** Multi-stage build
+
+The production Dockerfile uses a three-stage build process:
+
+1. **Base Stage** - Sets up pnpm and Node.js 22
+2. **Builder Stage** - Prunes monorepo workspace using Turbo
+3. **Installer Stage** - Installs dependencies and builds the project
+4. **Runner Stage** - Creates minimal production image
+
+#### Build Commands
+
+```bash
+# Build production image locally
+docker build -t nexushotel .
+
+# Run production container
+docker run -p 3000:3000 --env-file .env --name nexusweb nexushotel
+
+# Use pre-built image from Docker Hub
+docker run -p 3000:3000 --env-file .env --name nexusweb ssubaru/nexushotel:latest
+
+# Using Docker Compose
+docker compose up --build -d
+```
+
+#### Dockerfile Stages
+
+<CodeGroup>
+```dockerfile Base Stage
+FROM node:22-slim AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+```
+
+```dockerfile Builder Stage
+FROM base AS builder
+WORKDIR /app
+RUN npm install -g turbo
+COPY . .
+RUN turbo prune web --docker
+```
+
+```dockerfile Installer Stage
+FROM base AS installer
+WORKDIR /app
+COPY .gitignore .gitignore
+COPY --from=builder /app/out/json/ .
+COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+RUN pnpm install
+COPY --from=builder /app/out/full/ .
+COPY turbo.json turbo.json
+RUN npx turbo run build --filter=web...
+```
+
+```dockerfile Runner Stage
+FROM base AS runner
+WORKDIR /app
+COPY --from=installer /app .
+EXPOSE 3000
+CMD ["pnpm", "--filter", "web", "run", "start"]
+```
+</CodeGroup>
+
+### Dockerfile.dev (Development)
+
+**File:** `Dockerfile.dev`  
+**Port:** `3001`  
+**Features:** Hot-reload, development tools
+
+#### Build Commands
+
+```bash
+# Build development image
+docker build -f Dockerfile.dev -t nexushotel .
+
+# Run development container
+docker run -p 3001:3001 --env-file .env --name nexusdev nexushotel
+```
+
+#### Development Dockerfile
+
+```dockerfile
+FROM node:22-slim
+
+WORKDIR /app
+
+RUN npm install -g pnpm@latest turbo
+
+COPY . .
+RUN pnpm install
+
+EXPOSE 3001
+ENV NODE_ENV=development
+ENV HOST=0.0.0.0
+ENV PORT=3001
+
+CMD ["pnpm", "turbo", "run", "dev", "--filter=web"]
+```
+
+## Docker Compose Configuration
+
+**File:** `compose.yaml`
+
+```yaml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+    restart: always
+```
+
+### Compose Commands
+
+```bash
+# Start services in detached mode
+docker compose up -d
+
+# Build and start services
+docker compose up --build -d
+
+# Stop services
+docker compose down
+
+# View logs
+docker compose logs -f
+
+# Rebuild specific service
+docker compose build api
+```
+
+## Common Docker Commands
+
+### Container Management
+
+```bash
+# List running containers
+docker ps
+
+# List all containers
+docker ps -a
+
+# Stop container
+docker stop nexusweb
+
+# Remove container
+docker rm nexusweb
+
+# View container logs
+docker logs nexusweb
+
+# Follow container logs
+docker logs -f nexusweb
+
+# Execute command in running container
+docker exec -it nexusweb sh
+```
+
+### Image Management
+
+```bash
+# List images
+docker images
+
+# Remove image
+docker rmi nexushotel
+
+# Pull image from Docker Hub
+docker pull ssubaru/nexushotel:latest
+
+# Tag image
+docker tag nexushotel ssubaru/nexushotel:v1.0
+
+# Push image to registry
+docker push ssubaru/nexushotel:latest
+```
+
+### System Commands
+
+```bash
+# Remove unused data
+docker system prune
+
+# Remove all unused images
+docker image prune -a
+
+# Show disk usage
+docker system df
+
+# Inspect container
+docker inspect nexusweb
+```
+
+## Port Mappings
+
+| Environment | Container Port | Host Port | Purpose |
+|-------------|---------------|-----------|----------|
+| Development | 3001 | 3001 | Next.js dev server with hot-reload |
+| Production | 3000 | 3000 | Next.js production server |
+
+## Environment Variables
+
+See [Environment Variables](/reference/environment-variables) for complete list of required environment variables to use with `--env-file .env` flag.
+
+## Best Practices
+
+<Check>
+  Use production image (`Dockerfile`) for deployments
+</Check>
+
+<Check>
+  Use development image (`Dockerfile.dev`) for local development only
+</Check>
+
+<Check>
+  Always specify `--env-file .env` to load environment variables
+</Check>
+
+<Warning>
+  Production image size is optimized using multi-stage builds
+</Warning>
+
+<Warning>
+  Development image includes all dev dependencies and tools
+</Warning>

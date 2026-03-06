@@ -1,0 +1,487 @@
+---
+title: 'Local Development'
+description: 'Comprehensive guide for developing the Nexus Hotel platform locally'
+icon: 'laptop-code'
+---
+
+## Overview
+
+This guide covers everything you need to know for effective local development on the Nexus Hotel DevOps Platform, including Docker development containers, hot reload, debugging, and workflow best practices.
+
+## Development Environment Options
+
+The platform supports multiple development approaches:
+
+### 1. Native Development (Recommended for Quick Start)
+
+Run the application directly on your machine using Node.js and pnpm.
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+
+  <Step title="Start Development Server">
+    ```bash
+    pnpm dev
+    ```
+
+    This starts all applications with hot-reload enabled:
+    - Web app on http://localhost:3001 with Turbopack
+    - API with live reload via srvx
+  </Step>
+</Steps>
+
+### 2. Docker Development Container
+
+Use the development Docker container for isolated, consistent environments.
+
+<Note>
+  The development Docker setup provides **hot-reloading** capabilities, allowing you to see changes instantly without rebuilding.
+</Note>
+
+<Steps>
+  <Step title="Build Development Image">
+    Build the development Docker image:
+
+    ```bash
+    docker build -f Dockerfile.dev -t nexushotel:dev .
+    ```
+
+    This creates an image based on `node:22-slim` with pnpm and turbo installed.
+  </Step>
+
+  <Step title="Run Development Container">
+    Start the container with volume mounting for live code changes:
+
+    ```bash
+    docker run -p 3001:3001 \
+      --env-file .env \
+      -v $(pwd):/app \
+      -v /app/node_modules \
+      --name nexusdev \
+      nexushotel:dev
+    ```
+
+    **Command breakdown:**
+    - `-p 3001:3001` - Maps port 3001 to host
+    - `--env-file .env` - Loads environment variables
+    - `-v $(pwd):/app` - Mounts current directory for live updates
+    - `-v /app/node_modules` - Prevents overwriting node_modules
+    - `--name nexusdev` - Container name for easy management
+  </Step>
+
+  <Step title="Verify Hot Reload">
+    Make a change to any file in `apps/web/app/` and save. The container will:
+    1. Detect the file change
+    2. Recompile using Turbopack
+    3. Reload the browser automatically
+  </Step>
+</Steps>
+
+<Tip>
+  The development container runs `pnpm turbo run dev --filter=web` which uses **Turbopack** for ultra-fast hot module replacement (HMR).
+</Tip>
+
+## Hot Reload Configuration
+
+The project is configured for optimal hot reload across different environments:
+
+### Next.js with Turbopack
+
+The web application uses Next.js with Turbopack enabled:
+
+```json apps/web/package.json
+{
+  "scripts": {
+    "dev": "next dev --turbopack --port 3001"
+  }
+}
+```
+
+**Features:**
+- Ultra-fast hot module replacement (HMR)
+- Instant updates to React components
+- Automatic browser refresh on file changes
+- Optimized for large codebases
+
+### API Hot Reload
+
+The API uses `srvx` for automatic restarts:
+
+```json apps/api/package.json
+{
+  "scripts": {
+    "dev": "srvx"
+  }
+}
+```
+
+Changes to API files trigger automatic server restarts without manual intervention.
+
+### Turborepo Watch Mode
+
+Turborepo configuration ensures efficient task execution:
+
+```json turbo.json
+{
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
+    }
+  }
+}
+```
+
+- `"cache": false` - Disables caching for dev tasks
+- `"persistent": true` - Keeps dev servers running
+- `"dependsOn": ["^build"]` - Ensures dependencies are built first
+
+## Debugging
+
+### Debugging the Web App
+
+<Steps>
+  <Step title="Browser DevTools">
+    Next.js apps work seamlessly with browser DevTools:
+
+    1. Open http://localhost:3001
+    2. Press `F12` or `Cmd+Option+I` (Mac) / `Ctrl+Shift+I` (Windows/Linux)
+    3. Use the Sources tab to set breakpoints
+    4. React Developer Tools extension provides component inspection
+  </Step>
+
+  <Step title="Server-Side Debugging">
+    Add `debugger` statements in server components or API routes:
+
+    ```tsx
+    export default function Page() {
+      debugger; // Execution pauses here
+      return <div>Debug me</div>;
+    }
+    ```
+
+    Start dev server with Node inspector:
+
+    ```bash
+    NODE_OPTIONS='--inspect' pnpm dev
+    ```
+
+    Then open `chrome://inspect` in Chrome to attach the debugger.
+  </Step>
+</Steps>
+
+### Debugging the API
+
+<Steps>
+  <Step title="Add Debug Configuration">
+    Create `.vscode/launch.json` for VS Code:
+
+    ```json
+    {
+      "version": "0.2.0",
+      "configurations": [
+        {
+          "type": "node",
+          "request": "launch",
+          "name": "Debug API",
+          "cwd": "${workspaceFolder}/apps/api",
+          "runtimeExecutable": "pnpm",
+          "runtimeArgs": ["dev"],
+          "skipFiles": ["<node_internals>/**"]
+        }
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Start Debugging">
+    1. Open `apps/api/` in VS Code
+    2. Set breakpoints in your code
+    3. Press `F5` or use "Run and Debug" panel
+    4. Make requests to trigger breakpoints
+  </Step>
+</Steps>
+
+## Monorepo Development Workflow
+
+### Working Across Multiple Packages
+
+The monorepo structure allows you to work on multiple packages simultaneously:
+
+```bash
+# Run dev for specific package
+pnpm --filter web dev
+
+# Run dev for API only
+pnpm --filter api dev
+
+# Build specific package
+pnpm --filter web build
+
+# Run command in all packages
+pnpm -r dev
+```
+
+### Shared Package Development
+
+When developing shared packages (like `@repo/ui`):
+
+<Steps>
+  <Step title="Make Changes to Shared Package">
+    Edit files in `packages/ui/`
+  </Step>
+
+  <Step title="Rebuild if Necessary">
+    Some packages need rebuilding:
+
+    ```bash
+    pnpm --filter @repo/ui build
+    ```
+  </Step>
+
+  <Step title="Changes Reflect Automatically">
+    Apps using `workspace:*` dependencies will pick up changes immediately.
+  </Step>
+</Steps>
+
+### Turborepo Cache
+
+Turborepo caches task outputs for faster builds:
+
+```bash
+# Clear cache if you encounter issues
+pnpm turbo run build --force
+
+# Or manually clear cache
+rm -rf .turbo
+```
+
+## Code Quality Tools
+
+### Linting
+
+Run ESLint across all workspaces:
+
+```bash
+# Lint all packages
+pnpm lint
+
+# Lint specific package
+pnpm --filter web lint
+
+# Auto-fix issues
+pnpm --filter web lint --fix
+```
+
+The web app is configured with strict linting:
+
+```json apps/web/package.json
+{
+  "scripts": {
+    "lint": "next lint --max-warnings 0"
+  }
+}
+```
+
+### Type Checking
+
+Run TypeScript type checks:
+
+```bash
+# Check types for all packages
+pnpm check-types
+
+# Check types for specific package
+pnpm --filter web check-types
+```
+
+### Code Formatting
+
+Format code using Prettier:
+
+```bash
+# Format all files
+pnpm format
+
+# Format specific files
+pnpm format "apps/web/**/*.{ts,tsx}"
+```
+
+## Performance Optimization
+
+### Development Build Performance
+
+<Tip>
+  Turbopack in Next.js 16 provides significantly faster builds than Webpack. The `--turbopack` flag is already enabled in the dev script.
+</Tip>
+
+### Faster Dependency Installation
+
+Optimize pnpm installation:
+
+```bash
+# Use frozen lockfile in CI
+pnpm install --frozen-lockfile
+
+# Skip optional dependencies
+pnpm install --no-optional
+```
+
+## Docker Development Tips
+
+### Container Management
+
+```bash
+# Stop development container
+docker stop nexusdev
+
+# Restart container
+docker restart nexusdev
+
+# View logs
+docker logs -f nexusdev
+
+# Remove container
+docker rm nexusdev
+
+# Remove image
+docker rmi nexushotel:dev
+```
+
+### Development vs Production Images
+
+| Feature | Development (`Dockerfile.dev`) | Production (`Dockerfile`) |
+|---------|-------------------------------|---------------------------|
+| Base Image | `node:22-slim` | Multi-stage build |
+| Port | 3001 | 3000 |
+| Hot Reload | ✅ Yes | ❌ No |
+| Size | Larger (~800MB) | Optimized (~300MB) |
+| Use Case | Local development | Deployment |
+
+<Warning>
+  Never use `Dockerfile.dev` for production deployments. It includes development dependencies and debugging tools that increase security risks.
+</Warning>
+
+## Common Development Tasks
+
+### Adding a New Package
+
+<Steps>
+  <Step title="Create Package Directory">
+    ```bash
+    mkdir -p packages/my-package
+    cd packages/my-package
+    ```
+  </Step>
+
+  <Step title="Initialize Package">
+    ```bash
+    pnpm init
+    ```
+  </Step>
+
+  <Step title="Update Workspace Configuration">
+    Ensure `pnpm-workspace.yaml` includes your new package:
+
+    ```yaml
+    packages:
+      - "apps/*"
+      - "packages/*"
+    ```
+  </Step>
+
+  <Step title="Install and Use">
+    ```bash
+    # Install from root
+    pnpm install
+
+    # Use in another package
+    pnpm --filter web add @repo/my-package@workspace:*
+    ```
+  </Step>
+</Steps>
+
+### Adding Dependencies
+
+```bash
+# Add to specific workspace
+pnpm --filter web add react-query
+
+# Add dev dependency
+pnpm --filter web add -D @types/node
+
+# Add to root (for build tools)
+pnpm add -D -w prettier
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Changes not reflecting in browser">
+    1. Clear browser cache (Ctrl+Shift+R or Cmd+Shift+R)
+    2. Check terminal for build errors
+    3. Restart dev server: `Ctrl+C` then `pnpm dev`
+    4. Clear Turborepo cache: `rm -rf .turbo`
+    5. Clear Next.js cache: `rm -rf apps/web/.next`
+  </Accordion>
+
+  <Accordion title="Type errors in IDE but builds succeed">
+    1. Restart TypeScript server in VS Code: `Cmd+Shift+P` → "TypeScript: Restart TS Server"
+    2. Run type check manually: `pnpm check-types`
+    3. Ensure you're using workspace TypeScript: Check `.vscode/settings.json`
+  </Accordion>
+
+  <Accordion title="Docker container exits immediately">
+    1. Check container logs: `docker logs nexusdev`
+    2. Verify `.env` file exists and is valid
+    3. Ensure port 3001 is not already in use: `lsof -i :3001`
+    4. Rebuild image: `docker build -f Dockerfile.dev -t nexushotel:dev .`
+  </Accordion>
+
+  <Accordion title="pnpm workspace errors">
+    1. Delete `node_modules` and lockfile:
+       ```bash
+       rm -rf node_modules pnpm-lock.yaml
+       find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
+       ```
+    2. Reinstall: `pnpm install`
+    3. Verify `pnpm-workspace.yaml` is correct
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Commit Frequently" icon="code-commit">
+    Make small, focused commits with clear messages following the project's conventions.
+  </Card>
+
+  <Card title="Run Tests Before Pushing" icon="check">
+    Always run `pnpm lint` and `pnpm check-types` before committing.
+  </Card>
+
+  <Card title="Keep Dependencies Updated" icon="arrow-up">
+    Regularly update dependencies using `pnpm update` to get security fixes.
+  </Card>
+
+  <Card title="Use TypeScript Strictly" icon="shield">
+    Leverage TypeScript's type system. Avoid `any` types when possible.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Setup" icon="gear" href="/environment-setup">
+    Configure Supabase and environment variables
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Return to quick start guide
+  </Card>
+</CardGroup>

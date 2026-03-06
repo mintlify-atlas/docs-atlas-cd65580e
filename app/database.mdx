@@ -1,0 +1,529 @@
+---
+title: Database Integration
+description: Supabase integration for authentication and data persistence
+---
+
+The Nexus Hotel platform uses Supabase for authentication, database, and real-time features.
+
+## Overview
+
+<CardGroup cols={2}>
+  <Card title="Supabase" icon="database">
+    Open-source Firebase alternative
+  </Card>
+  <Card title="PostgreSQL" icon="server">
+    Powerful relational database
+  </Card>
+  <Card title="Auth" icon="lock">
+    Built-in authentication system
+  </Card>
+  <Card title="Real-time" icon="bolt">
+    Live data synchronization
+  </Card>
+</CardGroup>
+
+## Client Setup
+
+Supabase client is configured in `apps/web/utils/supabase/client.ts`:
+
+```typescript apps/web/utils/supabase/client.ts
+import { createClient } from '@supabase/supabase-js'
+
+export function createSupabaseClient() {
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+}
+```
+
+<Note>
+  The `NEXT_PUBLIC_` prefix makes these environment variables available in the browser.
+</Note>
+
+## Environment Variables
+
+Create a `.env.local` file in `apps/web/`:
+
+```bash apps/web/.env.local
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+<Warning>
+  Never commit `.env.local` to version control. Add it to `.gitignore`.
+</Warning>
+
+## Getting Supabase Credentials
+
+<Steps>
+  <Step title="Create a Supabase Project">
+    Go to [supabase.com](https://supabase.com) and create a new project.
+  </Step>
+  
+  <Step title="Get API Keys">
+    Navigate to **Settings → API** in your Supabase dashboard.
+    
+    Copy:
+    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+    - **anon/public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  </Step>
+  
+  <Step title="Configure Environment">
+    Add the credentials to your `.env.local` file.
+  </Step>
+</Steps>
+
+## Authentication
+
+The AuthModal component uses Supabase for user authentication.
+
+### Sign Up
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { error } = await supabase.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure-password',
+  options: {
+    data: {
+      full_name: 'John Doe',
+    },
+  },
+})
+```
+
+### Sign In
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { error } = await supabase.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure-password',
+})
+```
+
+### OAuth (GitHub)
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { error } = await supabase.auth.signInWithOAuth({
+  provider: 'github',
+  options: {
+    redirectTo: window.location.origin,
+  },
+})
+```
+
+### Sign Out
+
+```typescript
+const supabase = createSupabaseClient()
+
+await supabase.auth.signOut()
+```
+
+## Authentication Flow
+
+<Tabs>
+  <Tab title="Sign Up Flow">
+    1. User fills out sign-up form in AuthModal
+    2. `supabase.auth.signUp()` creates new user
+    3. Supabase sends confirmation email
+    4. User clicks confirmation link
+    5. Email is verified, user can sign in
+  </Tab>
+  
+  <Tab title="Sign In Flow">
+    1. User enters credentials in AuthModal
+    2. `supabase.auth.signInWithPassword()` authenticates
+    3. Session is created
+    4. Page reloads with authenticated state
+  </Tab>
+  
+  <Tab title="OAuth Flow">
+    1. User clicks "Continue with GitHub"
+    2. Redirected to GitHub authorization
+    3. User approves access
+    4. Redirected back to app with session
+    5. User is authenticated
+  </Tab>
+</Tabs>
+
+## Authentication Usage
+
+The AuthModal component (`apps/web/components/AuthModal/index.tsx`) implements these flows:
+
+```typescript apps/web/components/AuthModal/index.tsx
+'use client';
+
+import { useState } from 'react';
+import { createSupabaseClient } from '../../utils/supabase/client';
+
+const AuthModal = ({ isOpen, onClose }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    
+    const supabase = createSupabaseClient();
+    
+    const handleSignIn = async () => {
+        setLoading(true);
+        setError(null);
+        
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        
+        setLoading(false);
+        
+        if (error) {
+            setError(error.message);
+        } else {
+            onClose();
+            window.location.reload();
+        }
+    };
+    
+    // ... rest of component
+};
+```
+
+## Session Management
+
+### Get Current User
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { data: { user } } = await supabase.auth.getUser()
+
+if (user) {
+  console.log('User is authenticated:', user.email)
+} else {
+  console.log('No user logged in')
+}
+```
+
+### Get Session
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { data: { session } } = await supabase.auth.getSession()
+
+if (session) {
+  console.log('Access token:', session.access_token)
+}
+```
+
+### Listen to Auth Changes
+
+```typescript
+const supabase = createSupabaseClient()
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN') {
+    console.log('User signed in:', session.user)
+  } else if (event === 'SIGNED_OUT') {
+    console.log('User signed out')
+  }
+})
+```
+
+## Database Schema
+
+While not explicitly defined in the current codebase, a typical schema for the hotel platform would include:
+
+<Tabs>
+  <Tab title="Users">
+    ```sql
+    create table profiles (
+      id uuid references auth.users on delete cascade,
+      full_name text,
+      email text,
+      created_at timestamp with time zone default now(),
+      primary key (id)
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Rooms">
+    ```sql
+    create table rooms (
+      id uuid default gen_random_uuid() primary key,
+      name text not null,
+      description text,
+      price decimal(10,2) not null,
+      image_url text,
+      capacity int,
+      amenities jsonb,
+      created_at timestamp with time zone default now()
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Bookings">
+    ```sql
+    create table bookings (
+      id uuid default gen_random_uuid() primary key,
+      user_id uuid references profiles(id),
+      room_id uuid references rooms(id),
+      check_in date not null,
+      check_out date not null,
+      guests int,
+      total_price decimal(10,2),
+      status text default 'pending',
+      created_at timestamp with time zone default now()
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Reservations">
+    ```sql
+    create table reservations (
+      id uuid default gen_random_uuid() primary key,
+      user_id uuid references profiles(id),
+      reservation_date date not null,
+      reservation_time time not null,
+      party_size int,
+      special_requests text,
+      status text default 'pending',
+      created_at timestamp with time zone default now()
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## Database Operations
+
+### Insert Data
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { data, error } = await supabase
+  .from('bookings')
+  .insert({
+    room_id: 'room-uuid',
+    check_in: '2026-03-15',
+    check_out: '2026-03-20',
+    guests: 2,
+  })
+  .select()
+```
+
+### Query Data
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { data, error } = await supabase
+  .from('rooms')
+  .select('*')
+  .gte('price', 100)
+  .lte('price', 300)
+  .order('price', { ascending: true })
+```
+
+### Update Data
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { data, error } = await supabase
+  .from('bookings')
+  .update({ status: 'confirmed' })
+  .eq('id', 'booking-uuid')
+```
+
+### Delete Data
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { error } = await supabase
+  .from('bookings')
+  .delete()
+  .eq('id', 'booking-uuid')
+```
+
+## Real-time Subscriptions
+
+Subscribe to database changes:
+
+```typescript
+const supabase = createSupabaseClient()
+
+const channel = supabase
+  .channel('room-bookings')
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'bookings',
+    },
+    (payload) => {
+      console.log('New booking:', payload.new)
+    }
+  )
+  .subscribe()
+
+// Cleanup
+channel.unsubscribe()
+```
+
+## Storage (File Uploads)
+
+Supabase Storage can be used for room images:
+
+```typescript
+const supabase = createSupabaseClient()
+
+// Upload file
+const { data, error } = await supabase
+  .storage
+  .from('room-images')
+  .upload('room-1.jpg', file)
+
+// Get public URL
+const { data: { publicUrl } } = supabase
+  .storage
+  .from('room-images')
+  .getPublicUrl('room-1.jpg')
+```
+
+## Row Level Security (RLS)
+
+Enable RLS to secure your data:
+
+```sql
+-- Enable RLS
+alter table bookings enable row level security;
+
+-- Policy: Users can only see their own bookings
+create policy "Users can view own bookings"
+  on bookings for select
+  using (auth.uid() = user_id);
+
+-- Policy: Users can create their own bookings
+create policy "Users can create bookings"
+  on bookings for insert
+  with check (auth.uid() = user_id);
+```
+
+## Client-Side vs Server-Side
+
+<Tabs>
+  <Tab title="Client Component">
+    Use the client utility for browser-side operations:
+    
+    ```tsx
+    'use client'
+    
+    import { createSupabaseClient } from '@/utils/supabase/client'
+    
+    export default function Component() {
+      const supabase = createSupabaseClient()
+      // Use supabase...
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Server Component">
+    For server components, create a server client:
+    
+    ```typescript
+    // utils/supabase/server.ts
+    import { createServerClient } from '@supabase/ssr'
+    import { cookies } from 'next/headers'
+    
+    export function createServerSupabaseClient() {
+      const cookieStore = cookies()
+      
+      return createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) {
+              return cookieStore.get(name)?.value
+            },
+          },
+        }
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Error Handling
+
+```typescript
+const supabase = createSupabaseClient()
+
+const { data, error } = await supabase
+  .from('bookings')
+  .insert(bookingData)
+
+if (error) {
+  console.error('Database error:', error.message)
+  // Handle error appropriately
+} else {
+  console.log('Booking created:', data)
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="key">
+    Always use environment variables for credentials, never hardcode
+  </Card>
+  <Card title="Row Level Security" icon="shield">
+    Enable RLS on all tables to secure data access
+  </Card>
+  <Card title="Error Handling" icon="exclamation-triangle">
+    Always check for errors in Supabase operations
+  </Card>
+  <Card title="Type Safety" icon="code">
+    Use TypeScript types for database schemas
+  </Card>
+</CardGroup>
+
+## Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| @supabase/supabase-js | ^2.94.0 | Supabase JavaScript client |
+
+## Related Documentation
+
+<CardGroup cols={3}>
+  <Card title="Components" icon="puzzle-piece" href="/app/components">
+    AuthModal implementation
+  </Card>
+  <Card title="Frontend" icon="react" href="/app/frontend">
+    Next.js application
+  </Card>
+  <Card title="API" icon="server" href="/app/api">
+    Backend API service
+  </Card>
+</CardGroup>
+
+## External Resources
+
+<CardGroup cols={2}>
+  <Card title="Supabase Docs" icon="book" href="https://supabase.com/docs">
+    Official Supabase documentation
+  </Card>
+  <Card title="Auth Helpers" icon="key" href="https://supabase.com/docs/guides/auth/auth-helpers/nextjs">
+    Next.js auth helpers guide
+  </Card>
+</CardGroup>

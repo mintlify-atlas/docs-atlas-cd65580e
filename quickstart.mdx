@@ -1,80 +1,194 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quick Start'
+description: 'Get the Nexus Hotel DevOps Platform running locally in minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Get the Nexus Hotel reservation platform up and running on your local machine quickly. This guide will walk you through cloning the repository, installing dependencies, and starting the development server.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This is a monorepo project using **Turborepo** and **pnpm** workspaces with Next.js for the frontend and a Node.js API.
 </Note>
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** 22.x or later
+- **pnpm** 10.28.2 or later (recommended)
+- **Git** for version control
+
+<Tip>
+  The project uses `pnpm@10.28.2` as specified in the `packageManager` field. It will be automatically used if you have Corepack enabled.
+</Tip>
+
+## Quick Start Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the Nexus Hotel project from your Git repository:
+
+    ```bash
+    git clone <repository-url>
+    cd proyecto-de-devops
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all workspace dependencies using your preferred package manager:
+
+    <CodeGroup>
+      ```bash pnpm
+      pnpm install
+      ```
+
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn install
+      ```
+    </CodeGroup>
+
+    <Note>
+      The project is optimized for **pnpm**. Using npm or yarn may work but is not officially supported.
+    </Note>
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Create a `.env` file in the root directory by copying the example:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Update the `.env` file with your configuration:
+
+    ```bash .env
+    PORT=3001
+    DATABASE_URL=your-supabase-database-url
+    API_KEY=your-api-key
+    ```
+
+    <Warning>
+      You'll need a Supabase project to get the `DATABASE_URL`. See the [Environment Setup](/environment-setup) guide for details.
+    </Warning>
+  </Step>
+
+  <Step title="Start the Development Server">
+    Run the development server using Turborepo:
+
+    <CodeGroup>
+      ```bash pnpm
+      pnpm dev
+      ```
+
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash yarn
+      yarn dev
+      ```
+    </CodeGroup>
+
+    This command starts all applications in the monorepo in watch mode:
+    - **Web app** (Next.js): http://localhost:3001
+    - **API**: Runs on configured port
+  </Step>
+
+  <Step title="Verify Installation">
+    Open your browser and navigate to:
+
+    ```
+    http://localhost:3001
+    ```
+
+    You should see the Nexus Hotel reservation platform homepage.
+  </Step>
+</Steps>
+
+## Project Structure
+
+The monorepo is organized as follows:
+
+```
+proyecto-de-devops/
+├── apps/
+│   ├── web/          # Next.js frontend application (port 3001)
+│   └── api/          # Node.js API backend
+├── packages/
+│   ├── ui/           # Shared UI components
+│   ├── constants/    # Shared constants
+│   └── config/       # Shared configurations
+├── turbo.json        # Turborepo configuration
+├── pnpm-workspace.yaml
+└── package.json      # Root workspace configuration
+```
+
+## Available Scripts
+
+From the root directory, you can run:
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start development servers for all apps |
+| `pnpm build` | Build all applications for production |
+| `pnpm lint` | Run ESLint across all workspaces |
+| `pnpm format` | Format code using Prettier |
+| `pnpm check-types` | Run TypeScript type checking |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Local Development" icon="code" href="/local-development">
+    Learn about hot reload, debugging, and advanced dev workflows
+  </Card>
+  
+  <Card title="Environment Setup" icon="gear" href="/environment-setup">
+    Configure Supabase, environment variables, and prerequisites
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Port 3001 is already in use">
+    If port 3001 is occupied, you can change it in `apps/web/package.json`:
+
+    ```json
+    "scripts": {
+      "dev": "next dev --turbopack --port 3002"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="pnpm command not found">
+    Install pnpm globally:
+
+    ```bash
+    npm install -g pnpm@10.28.2
+    ```
+
+    Or enable Corepack:
+
+    ```bash
+    corepack enable
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    Ensure your `DATABASE_URL` in `.env` is correct and your Supabase project is active. See [Environment Setup](/environment-setup) for configuration details.
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+If you encounter issues:
+
+- Check the project's [Jira board](https://hoteldevops.atlassian.net/jira/core/projects/NXS/calendar)
+- Review the [Local Development](/local-development) guide for advanced troubleshooting
+- Ensure all prerequisites are correctly installed

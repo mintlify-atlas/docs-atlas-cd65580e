@@ -1,0 +1,321 @@
+---
+title: Monitoring & Observability
+description: Monitoring, logging, and observability practices for Nexus Hotel platform
+---
+
+# Monitoring & Observability
+
+Effective monitoring and observability are critical for maintaining the high availability and reliability required by the Nexus Hotel platform.
+
+## Monitoring Stack
+
+The Nexus Hotel platform uses the following technologies for monitoring:
+
+- **Grafana**: System performance and health monitoring
+- **Kubernetes Native Tools**: kubectl for real-time cluster inspection
+- **Application Logs**: Centralized logging from all pods
+
+---
+
+## Grafana Monitoring
+
+**Grafana** provides real-time monitoring of system performance and health metrics.
+
+### Key Metrics to Monitor
+
+- **Application Performance**: Response times, request rates, error rates
+- **Resource Utilization**: CPU, memory, network, disk usage
+- **Pod Health**: Pod restarts, crash loops, readiness status
+- **Database Performance**: Query times, connection pool status
+- **Ingress Traffic**: Request volume, geographic distribution
+
+### Grafana Best Practices
+
+- Set up alerts for critical metrics (CPU > 80%, memory > 90%)
+- Create dashboards for each service (web, api, database)
+- Monitor deployment rollouts for anomalies
+- Track user-facing metrics (page load times, API latency)
+- Configure notification channels (Slack, email, PagerDuty)
+
+---
+
+## Kubernetes Monitoring with kubectl
+
+### Viewing Cluster Resources
+
+Get an overview of all resources in the nexushotel namespace:
+
+```bash
+# View all resources (pods, services, deployments)
+kubectl get all -n nexushotel
+
+# Watch resources in real-time
+kubectl get pods -n nexushotel --watch
+
+# Get detailed resource information
+kubectl get pods -n nexushotel -o wide
+```
+
+### Pod Status Monitoring
+
+Monitor the health and status of running pods:
+
+```bash
+# Check pod status
+kubectl get pods -n nexushotel
+
+# View pod details and events
+kubectl describe pod <pod-name> -n nexushotel
+
+# Check pod resource usage
+kubectl top pods -n nexushotel
+```
+
+### Application Logs
+
+Access and stream application logs:
+
+```bash
+# View logs from all pods with label app=nexushotel-web
+kubectl logs -n nexushotel -l app=nexushotel-web
+
+# Stream logs in real-time
+kubectl logs -n nexushotel -l app=nexushotel-web --follow
+
+# View logs from a specific pod
+kubectl logs -n nexushotel <pod-name>
+
+# View logs from previous container instance (after crash)
+kubectl logs -n nexushotel <pod-name> --previous
+
+# View logs with timestamps
+kubectl logs -n nexushotel <pod-name> --timestamps
+
+# Tail last 100 lines
+kubectl logs -n nexushotel <pod-name> --tail=100
+```
+
+### Deployment Monitoring
+
+Monitor deployment rollouts and status:
+
+```bash
+# Check deployment status
+kubectl get deployment nexushotel-web -n nexushotel
+
+# View deployment details
+kubectl describe deployment nexushotel-web -n nexushotel
+
+# Check rollout status
+kubectl rollout status deployment/nexushotel-web -n nexushotel
+
+# View rollout history
+kubectl rollout history deployment/nexushotel-web -n nexushotel
+```
+
+### Service and Ingress Monitoring
+
+```bash
+# Check service endpoints
+kubectl get svc -n nexushotel
+kubectl describe svc nexushotel-svc -n nexushotel
+
+# Check ingress configuration
+kubectl get ingress -n nexushotel
+kubectl describe ingress -n nexushotel
+```
+
+---
+
+## Resource Utilization
+
+### Current Resource Configuration
+
+Based on helm/values.yaml:monitoring.mdx:39-46, the platform is configured with:
+
+**Requests (Guaranteed Resources):**
+- Memory: 256Mi per pod
+- CPU: 100m per pod
+
+**Limits (Maximum Resources):**
+- Memory: 512Mi per pod
+- CPU: 500m per pod
+
+### Monitoring Resource Usage
+
+```bash
+# View node resource usage
+kubectl top nodes
+
+# View pod resource usage
+kubectl top pods -n nexushotel
+
+# Check resource quotas
+kubectl describe resourcequota -n nexushotel
+```
+
+### Resource Alerts
+
+Monitor for these conditions:
+- Pods approaching memory limits (>90%)
+- Pods approaching CPU limits (>80%)
+- Frequent pod restarts
+- Node resource exhaustion
+- OOMKilled events
+
+---
+
+## High Availability Monitoring
+
+The platform maintains **3 replicas** for high availability (k8s/deployment.yaml:deployment.mdx:9).
+
+### Replica Health Checks
+
+```bash
+# Check replica count and availability
+kubectl get deployment nexushotel-web -n nexushotel
+
+# View replica set status
+kubectl get rs -n nexushotel
+
+# Check pod distribution across nodes
+kubectl get pods -n nexushotel -o wide
+```
+
+### Availability Metrics to Track
+
+- **Desired Replicas**: Should always be 3
+- **Ready Replicas**: Should match desired count
+- **Available Replicas**: Should match desired count
+- **Pod Distribution**: Pods should be spread across different nodes
+
+---
+
+## Event Monitoring
+
+Kubernetes events provide crucial information about cluster activities:
+
+```bash
+# View all events in namespace
+kubectl get events -n nexushotel
+
+# Watch events in real-time
+kubectl get events -n nexushotel --watch
+
+# Sort events by timestamp
+kubectl get events -n nexushotel --sort-by='.lastTimestamp'
+
+# Filter warning events
+kubectl get events -n nexushotel --field-selector type=Warning
+```
+
+---
+
+## Log Analysis
+
+### Log Patterns to Monitor
+
+**Error Patterns:**
+```bash
+# Search for errors in logs
+kubectl logs -n nexushotel -l app=nexushotel-web | grep -i error
+
+# Search for specific error codes
+kubectl logs -n nexushotel -l app=nexushotel-web | grep "500\|503\|504"
+```
+
+**Performance Issues:**
+```bash
+# Monitor slow queries
+kubectl logs -n nexushotel -l app=nexushotel-web | grep "slow query"
+
+# Check timeout errors
+kubectl logs -n nexushotel -l app=nexushotel-web | grep timeout
+```
+
+---
+
+## Health Checks
+
+### Application Health
+
+```bash
+# Port-forward to access application locally
+kubectl port-forward -n nexushotel svc/nexushotel-svc 8080:80
+
+# Execute commands inside a pod
+kubectl exec -n nexushotel <pod-name> -- curl localhost:3000
+```
+
+### Database Connectivity
+
+The platform uses **Supabase** for database and authentication:
+
+- Monitor Supabase connection pool status
+- Track query performance metrics
+- Watch for authentication failures
+- Monitor API rate limits
+
+---
+
+## Monitoring Dashboard Checklist
+
+Your Grafana dashboard should include:
+
+- [ ] Pod count and health status
+- [ ] CPU and memory usage per pod
+- [ ] Request rate and latency
+- [ ] Error rate and status codes
+- [ ] Database query performance
+- [ ] Ingress traffic volume
+- [ ] Deployment version and rollout status
+- [ ] Supabase connection metrics
+- [ ] Disk usage and I/O
+- [ ] Network throughput
+
+---
+
+## Alerting Best Practices
+
+### Critical Alerts
+
+Set up immediate notifications for:
+- Application down (0 ready replicas)
+- High error rate (>5% of requests)
+- Resource exhaustion (>90% memory/CPU)
+- Pod crash loops
+- Database connection failures
+
+### Warning Alerts
+
+Set up warning notifications for:
+- Elevated response times (>2s p95)
+- Increased error rate (>1% of requests)
+- High resource usage (>70% memory/CPU)
+- Deployment issues
+- Certificate expiration (< 30 days)
+
+---
+
+## Monitoring Workflow
+
+### Daily Checks
+1. Review Grafana dashboards for anomalies
+2. Check pod health: `kubectl get pods -n nexushotel`
+3. Review recent events: `kubectl get events -n nexushotel`
+4. Verify replica count matches desired state
+
+### During Deployments
+1. Monitor rollout status: `kubectl rollout status deployment/nexushotel-web -n nexushotel`
+2. Watch pod creation: `kubectl get pods -n nexushotel --watch`
+3. Stream logs: `kubectl logs -n nexushotel -l app=nexushotel-web --follow`
+4. Check for errors in logs
+5. Verify all replicas are ready
+
+### Incident Response
+1. Check Grafana for metric anomalies
+2. Review recent events and logs
+3. Identify affected pods: `kubectl describe pod <pod-name> -n nexushotel`
+4. Collect logs for analysis
+5. Check resource utilization
+6. Review recent deployments or changes

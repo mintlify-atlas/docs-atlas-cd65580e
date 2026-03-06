@@ -1,0 +1,294 @@
+---
+title: Terraform Variables
+description: Complete Terraform variable reference for Nexus Hotel infrastructure
+---
+
+## Overview
+
+Terraform automates the creation and management of Nexus Hotel infrastructure on Vercel, including project creation, environment variable synchronization, and deployment configuration.
+
+## Provider Configuration
+
+Nexus Hotel uses the official Vercel Terraform provider.
+
+```hcl
+terraform {
+  required_providers {
+    vercel = {
+      source  = "vercel/vercel"
+      version = "~> 1.0"
+    }
+  }
+}
+
+provider "vercel" {
+  api_token = var.vercel_api_token
+  team      = var.vercel_team_id
+}
+```
+
+## Variables
+
+### Vercel Authentication
+
+<ParamField path="vercel_api_token" type="string" required>
+  Vercel API authentication token
+  
+  **Sensitive:** Yes  
+  **How to obtain:** Generate from [Vercel Account Settings → Tokens](https://vercel.com/account/tokens)
+  
+  ```hcl
+  variable "vercel_api_token" {
+    description = "The API token for Vercel authentication"
+    type        = string
+    sensitive   = true
+  }
+  ```
+</ParamField>
+
+<ParamField path="vercel_team_id" type="string" required>
+  Vercel Team/Organization ID
+  
+  **How to obtain:** Found in Vercel team settings URL or team settings page
+  
+  ```hcl
+  variable "vercel_team_id" {
+    description = "The Team ID for Vercel Organization"
+    type        = string
+  }
+  ```
+</ParamField>
+
+### Repository Configuration
+
+<ParamField path="github_repo" type="string" default="PavoAyala/proyecto-de-devops">
+  GitHub repository name in format `owner/repository`
+  
+  ```hcl
+  variable "github_repo" {
+    description = "The GitHub repository name (e.g., user/repo)"
+    type        = string
+    default     = "PavoAyala/proyecto-de-devops"
+  }
+  ```
+</ParamField>
+
+### Supabase Configuration
+
+<ParamField path="supabase_url" type="string" required>
+  Supabase project URL
+  
+  **Format:** `https://<project-id>.supabase.co`  
+  **How to obtain:** Supabase Project Settings → API → Project URL
+  
+  ```hcl
+  variable "supabase_url" {
+    description = "The Supabase URL"
+    type        = string
+  }
+  ```
+</ParamField>
+
+<ParamField path="supabase_anon_key" type="string" required>
+  Supabase anonymous public API key
+  
+  **Sensitive:** Yes  
+  **How to obtain:** Supabase Project Settings → API → `anon` `public` key
+  
+  ```hcl
+  variable "supabase_anon_key" {
+    description = "The Supabase Anon Key"
+    type        = string
+    sensitive   = true
+  }
+  ```
+</ParamField>
+
+## Resources Created
+
+### Web Project
+
+The Terraform configuration creates a Vercel project for the Next.js web application.
+
+```hcl
+resource "vercel_project" "web" {
+  name      = "hotel-project-web"
+  framework = "nextjs"
+  team_id   = var.vercel_team_id
+
+  git_repository = {
+    type = "github"
+    repo = var.github_repo
+  }
+
+  root_directory = "apps/web"
+
+  install_command = "pnpm install --prefix=../.."
+  build_command   = "npx turbo run build --filter=web"
+}
+```
+
+**Environment Variables Set:**
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### API Project
+
+The Terraform configuration creates a Vercel project for the API application.
+
+```hcl
+resource "vercel_project" "api" {
+  name    = "hotel-project-api"
+  team_id = var.vercel_team_id
+
+  git_repository = {
+    type = "github"
+    repo = var.github_repo
+  }
+
+  root_directory = "apps/api"
+
+  install_command  = "pnpm install --prefix=../.."
+  build_command    = "cd ../.. && npx turbo run build --filter=api"
+  output_directory = "dist"
+}
+```
+
+**Environment Variables Set:**
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+## Usage
+
+### Setting Variables
+
+#### Option 1: terraform.tfvars
+
+Create `terraform/terraform.tfvars`:
+
+```hcl
+vercel_api_token   = "your-vercel-token"
+vercel_team_id     = "team_xxxxxxxxxxxxx"
+github_repo        = "yourusername/your-repo"
+supabase_url       = "https://xxxxx.supabase.co"
+supabase_anon_key  = "your-supabase-anon-key"
+```
+
+<Warning>
+  Never commit `terraform.tfvars` to version control. Add it to `.gitignore`.
+</Warning>
+
+#### Option 2: Environment Variables
+
+```bash
+export TF_VAR_vercel_api_token="your-vercel-token"
+export TF_VAR_vercel_team_id="team_xxxxxxxxxxxxx"
+export TF_VAR_github_repo="yourusername/your-repo"
+export TF_VAR_supabase_url="https://xxxxx.supabase.co"
+export TF_VAR_supabase_anon_key="your-supabase-anon-key"
+```
+
+#### Option 3: Command Line
+
+```bash
+terraform apply \
+  -var="vercel_api_token=your-token" \
+  -var="vercel_team_id=team_xxx" \
+  -var="github_repo=user/repo" \
+  -var="supabase_url=https://xxx.supabase.co" \
+  -var="supabase_anon_key=your-key"
+```
+
+### Terraform Commands
+
+```bash
+# Navigate to terraform directory
+cd terraform
+
+# Initialize Terraform
+terraform init
+
+# Validate configuration
+terraform validate
+
+# Preview changes
+terraform plan
+
+# Apply changes
+terraform apply
+
+# Show current state
+terraform show
+
+# Destroy resources
+terraform destroy
+```
+
+## Variable Validation Example
+
+Add validation to ensure correct variable formats:
+
+```hcl
+variable "supabase_url" {
+  description = "The Supabase URL"
+  type        = string
+  
+  validation {
+    condition     = can(regex("^https://.*\\.supabase\\.co$", var.supabase_url))
+    error_message = "Supabase URL must be in format: https://<project-id>.supabase.co"
+  }
+}
+
+variable "github_repo" {
+  description = "The GitHub repository name"
+  type        = string
+  default     = "PavoAyala/proyecto-de-devops"
+  
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.github_repo))
+    error_message = "GitHub repo must be in format: owner/repository"
+  }
+}
+```
+
+## What Terraform Manages
+
+<Check>
+  **Vercel Projects** - Automatically creates `hotel-project-web` and `hotel-project-api`
+</Check>
+
+<Check>
+  **Environment Variables** - Syncs Supabase credentials to all environments (production, preview, development)
+</Check>
+
+<Check>
+  **Build Configuration** - Sets up monorepo build commands for both projects
+</Check>
+
+<Check>
+  **Infrastructure as Code** - Version-controlled, reproducible infrastructure
+</Check>
+
+## Security Best Practices
+
+<Warning>
+  Store sensitive variables in environment variables or encrypted secret storage
+</Warning>
+
+<Warning>
+  Never commit `terraform.tfvars` or `*.tfvars` files containing secrets
+</Warning>
+
+<Check>
+  Use Terraform Cloud or backend encryption for remote state
+</Check>
+
+<Check>
+  Rotate API tokens and keys regularly
+</Check>
+
+## Related Documentation
+
+- [Terraform Commands](/reference/commands#terraform-commands)
+- [Environment Variables](/reference/environment-variables)
+- [Infrastructure Setup Guide](/deployment/infrastructure)

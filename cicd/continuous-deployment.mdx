@@ -1,0 +1,272 @@
+---
+title: 'Continuous Deployment'
+description: 'Automated deployment to Kubernetes using Helm'
+---
+
+## Deployment Overview
+
+The Nexus Hotel platform uses Helm to manage Kubernetes deployments. Every merge to the main branch triggers an automatic deployment with zero downtime using rolling updates.
+
+## Deployment Architecture
+
+The application is deployed to Kubernetes with the following resources:
+
+- **Namespace**: `nexushotel` - Isolated environment for all resources
+- **Deployment**: 3 replicas for high availability
+- **Service**: ClusterIP for internal routing
+- **Ingress**: NGINX ingress for external access
+
+## Helm Chart Structure
+
+The Helm chart is located in the `./helm` directory:
+
+```yaml
+apiVersion: v2
+name: nexushotel
+description: Helm Chart para desplegar la aplicación web Nexus Hotel en Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+```
+
+## Deployment Configuration
+
+Default values are defined in `helm/values.yaml`:
+
+```yaml
+# Docker image configuration
+image:
+  repository: ssubaru/nexushotel
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# High availability setup
+replicaCount: 3
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# Resource limits
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+## Deployment Process
+
+<Steps>
+  <Step title="Image Tag Resolution">
+    Generate image tag from Git commit SHA for traceability
+    
+    ```bash
+    IMAGE_TAG=${GITHUB_SHA::7}
+    ```
+    
+    This ensures every deployment maps to a specific code version.
+  </Step>
+  
+  <Step title="Helm Upgrade/Install">
+    Deploy using Helm's upgrade command with automatic install fallback
+    
+    ```bash
+    helm upgrade --install nexushotel ./helm \
+      --namespace nexushotel \
+      --create-namespace \
+      --set image.repository=ssubaru/nexushotel \
+      --set image.tag=$IMAGE_TAG \
+      --set image.pullPolicy=Always \
+      --wait \
+      --timeout 5m
+    ```
+  </Step>
+  
+  <Step title="Rolling Update">
+    Kubernetes performs a rolling update, replacing pods one at a time:
+    
+    - New pods are created with the updated image
+    - Health checks ensure new pods are ready
+    - Old pods are terminated only after new pods are healthy
+    - Service continues routing traffic throughout the update
+  </Step>
+  
+  <Step title="Deployment Verification">
+    The `--wait` flag ensures Helm waits for all pods to be ready before completing:
+    
+    - Timeout set to 5 minutes
+    - All 3 replicas must pass health checks
+    - Service endpoints are automatically updated
+  </Step>
+</Steps>
+
+## Kubernetes Resources
+
+### Deployment Spec
+
+The deployment creates 3 replicas with resource constraints:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexushotel-web
+  namespace: nexushotel
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nexushotel-web
+  template:
+    spec:
+      containers:
+        - name: web
+          image: nexushotel-web:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+```
+
+### Service Configuration
+
+Internal ClusterIP service routes traffic to pods:
+
+```yaml
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+```
+
+### Ingress Setup
+
+NGINX ingress provides external access:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  host: nexushotel.local
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+```
+
+<Note>
+  Update `ingress.host` in values.yaml to your production domain before deploying to production.
+</Note>
+
+## Environment Variables
+
+The application receives runtime configuration through environment variables:
+
+```yaml
+env:
+  NODE_ENV: production
+  PORT: "3000"
+```
+
+## Zero-Downtime Deployments
+
+The deployment strategy ensures zero downtime:
+
+1. **Health Checks**: New pods must pass readiness checks
+2. **Gradual Rollout**: Pods are replaced incrementally
+3. **Automatic Rollback**: Failed deployments are automatically reverted
+4. **Service Continuity**: Load balancer only routes to healthy pods
+
+## Deployment Workflow
+
+From the GitHub Actions CD workflow:
+
+```yaml
+steps:
+  # Configure kubectl
+  - name: Configurar kubectl
+    uses: azure/setup-kubectl@v3
+    with:
+      version: "latest"
+
+  # Write kubeconfig from secret
+  - name: Escribir kubeconfig
+    run: |
+      mkdir -p $HOME/.kube
+      echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+      chmod 600 $HOME/.kube/config
+
+  # Install Helm
+  - name: Instalar Helm
+    uses: azure/setup-helm@v3
+    with:
+      version: "latest"
+
+  # Deploy
+  - name: Helm upgrade --install
+    run: |
+      helm upgrade --install nexushotel ./helm \
+        --namespace nexushotel \
+        --create-namespace \
+        --set image.tag=${{ steps.vars.outputs.IMAGE_TAG }} \
+        --wait \
+        --timeout 5m
+```
+
+## Monitoring Deployments
+
+Check deployment status:
+
+```bash
+# View deployment status
+kubectl get deployments -n nexushotel
+
+# View pod status
+kubectl get pods -n nexushotel
+
+# View deployment history
+helm history nexushotel -n nexushotel
+
+# View logs
+kubectl logs -n nexushotel -l app=nexushotel-web
+```
+
+## Rollback Procedures
+
+If a deployment fails, rollback to the previous version:
+
+```bash
+# Rollback to previous release
+helm rollback nexushotel -n nexushotel
+
+# Rollback to specific revision
+helm rollback nexushotel [REVISION] -n nexushotel
+```
+
+## Scaling
+
+Adjust replica count as needed:
+
+```bash
+# Scale via Helm
+helm upgrade nexushotel ./helm \
+  --set replicaCount=5 \
+  --namespace nexushotel
+
+# Scale via kubectl
+kubectl scale deployment nexushotel-web \
+  --replicas=5 \
+  -n nexushotel
+```
+
+<Card title="GitHub Actions Workflow" icon="github" href="/cicd/github-actions">
+  See the complete GitHub Actions workflow configuration
+</Card>

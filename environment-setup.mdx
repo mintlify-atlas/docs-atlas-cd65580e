@@ -1,0 +1,551 @@
+---
+title: 'Environment Setup'
+description: 'Configure environment variables, Supabase, and prerequisites for Nexus Hotel'
+icon: 'gear'
+---
+
+## Overview
+
+This guide walks you through setting up all environment variables, configuring Supabase as the database and authentication provider, and ensuring all prerequisites are met for the Nexus Hotel DevOps Platform.
+
+<Note>
+  The platform uses **Supabase** for database management and user authentication, providing a secure and scalable backend.
+</Note>
+
+## Prerequisites
+
+Before configuring your environment, ensure you have:
+
+### Required Software
+
+<Steps>
+  <Step title="Node.js 22.x">
+    The project requires Node.js version 22.x:
+
+    ```bash
+    node --version
+    # Should output v22.x.x
+    ```
+
+    **Installation:**
+    - Download from [nodejs.org](https://nodejs.org/)
+    - Or use [nvm](https://github.com/nvm-sh/nvm):
+      ```bash
+      nvm install 22
+      nvm use 22
+      ```
+  </Step>
+
+  <Step title="pnpm 10.28.2+">
+    The project uses pnpm as the package manager:
+
+    ```bash
+    pnpm --version
+    # Should output 10.28.2 or higher
+    ```
+
+    **Installation:**
+    ```bash
+    # Using npm
+    npm install -g pnpm@10.28.2
+
+    # Or enable Corepack (recommended)
+    corepack enable
+    ```
+
+    <Tip>
+      With Corepack enabled, the correct pnpm version will be automatically used based on the `packageManager` field in `package.json`.
+    </Tip>
+  </Step>
+
+  <Step title="Git">
+    Version control is essential for collaboration:
+
+    ```bash
+    git --version
+    ```
+
+    Download from [git-scm.com](https://git-scm.com/) if not installed.
+  </Step>
+</Steps>
+
+### Optional Tools
+
+| Tool | Purpose | Installation |
+|------|---------|-------------|
+| **Docker** | Containerized development and production | [docker.com](https://www.docker.com/get-started) |
+| **VS Code** | Recommended code editor | [code.visualstudio.com](https://code.visualstudio.com/) |
+| **Terraform** | Infrastructure as code (for deployment) | [terraform.io](https://www.terraform.io/downloads) |
+| **kubectl** | Kubernetes CLI (for K8s deployment) | [kubernetes.io](https://kubernetes.io/docs/tasks/tools/) |
+
+## Environment Variables
+
+The platform uses environment variables for configuration. These should never be committed to version control.
+
+### Base Configuration
+
+<Steps>
+  <Step title="Create .env File">
+    Copy the example environment file:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    This creates your local environment configuration file.
+  </Step>
+
+  <Step title="Configure Required Variables">
+    Open `.env` and configure the following variables:
+
+    ```bash .env
+    # Application Port
+    PORT=3001
+
+    # Database Connection
+    DATABASE_URL=
+
+    # API Authentication
+    API_KEY=
+    ```
+  </Step>
+</Steps>
+
+### Environment Variable Reference
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|----------|
+| `PORT` | Port for the web application | Yes | `3001` |
+| `DATABASE_URL` | Supabase database connection string | Yes | `postgresql://...` |
+| `API_KEY` | API authentication key | Yes | `your-secret-key` |
+
+<Warning>
+  Keep your `.env` file secure and never commit it to version control. It's already included in `.gitignore`.
+</Warning>
+
+## Supabase Setup
+
+Supabase provides the backend infrastructure including PostgreSQL database and authentication.
+
+### Creating a Supabase Project
+
+<Steps>
+  <Step title="Sign Up for Supabase">
+    1. Go to [supabase.com](https://supabase.com/)
+    2. Click "Start your project"
+    3. Sign up with GitHub or email
+  </Step>
+
+  <Step title="Create New Project">
+    1. Click "New Project" in your dashboard
+    2. Fill in project details:
+       - **Name**: `nexus-hotel` (or your preferred name)
+       - **Database Password**: Generate a strong password (save this!)
+       - **Region**: Choose closest to your users
+       - **Pricing Plan**: Free tier works for development
+    3. Click "Create new project"
+    4. Wait 2-3 minutes for provisioning
+  </Step>
+
+  <Step title="Get Database URL">
+    Once your project is ready:
+
+    1. Navigate to **Settings** → **Database**
+    2. Scroll to **Connection string**
+    3. Select **URI** tab
+    4. Copy the connection string (looks like `postgresql://...`)
+    5. Replace `[YOUR-PASSWORD]` with your database password
+  </Step>
+
+  <Step title="Update .env File">
+    Add the connection string to your `.env` file:
+
+    ```bash .env
+    DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.xxxxxxxxxxxxx.supabase.co:5432/postgres
+    ```
+  </Step>
+</Steps>
+
+### Supabase Configuration
+
+The web application uses `@supabase/supabase-js` for database and authentication:
+
+```json apps/web/package.json
+{
+  "dependencies": {
+    "@supabase/supabase-js": "^2.94.0"
+  }
+}
+```
+
+### Database Schema Setup
+
+<Note>
+  The Nexus Hotel platform requires specific database tables for reservations, users, and facilities.
+</Note>
+
+<Steps>
+  <Step title="Access SQL Editor">
+    In your Supabase dashboard:
+    1. Navigate to **SQL Editor**
+    2. Click **New Query**
+  </Step>
+
+  <Step title="Create Tables">
+    The platform manages:
+    - 🛏️ **Room reservations**
+    - 🍽️ **Restaurant table bookings**
+    - 🏢 **Event space reservations**
+    - 👤 **User profiles and preferences**
+    - 💳 **Secure payment information**
+
+    Refer to the project's database migration files or schema documentation for exact table structures.
+  </Step>
+
+  <Step title="Enable Row Level Security (RLS)">
+    For production security, enable RLS on sensitive tables:
+
+    ```sql
+    ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
+    
+    -- Create policies as needed
+    CREATE POLICY "Users can view their own reservations"
+      ON reservations FOR SELECT
+      USING (auth.uid() = user_id);
+    ```
+  </Step>
+</Steps>
+
+### Authentication Setup
+
+Configure Supabase Auth for user management:
+
+<Steps>
+  <Step title="Configure Auth Providers">
+    1. Go to **Authentication** → **Providers**
+    2. Enable desired providers:
+       - **Email**: For email/password authentication
+       - **Google**: For social login (requires OAuth setup)
+       - **GitHub**: For developer-friendly login
+  </Step>
+
+  <Step title="Configure Email Templates">
+    Customize email templates in **Authentication** → **Email Templates**:
+    - Welcome emails
+    - Password reset
+    - Email confirmation
+  </Step>
+
+  <Step title="Set Site URL">
+    In **Authentication** → **URL Configuration**:
+
+    ```
+    Site URL: http://localhost:3001
+    Redirect URLs: http://localhost:3001/auth/callback
+    ```
+
+    <Tip>
+      Update these URLs when deploying to production (e.g., `https://nexushotel.com`).
+    </Tip>
+  </Step>
+</Steps>
+
+## API Key Configuration
+
+Generate a secure API key for backend authentication:
+
+### Generating an API Key
+
+```bash
+# Generate a random API key (Linux/Mac)
+openssl rand -hex 32
+
+# Or use Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Add the generated key to your `.env` file:
+
+```bash .env
+API_KEY=your-generated-api-key-here
+```
+
+<Warning>
+  Use different API keys for development, staging, and production environments.
+</Warning>
+
+## Multi-Environment Configuration
+
+For managing multiple environments (development, staging, production):
+
+### Development Environment
+
+```bash .env.development
+PORT=3001
+DATABASE_URL=postgresql://postgres:dev-password@db.dev.supabase.co:5432/postgres
+API_KEY=dev-api-key-12345
+NODE_ENV=development
+```
+
+### Production Environment
+
+```bash .env.production
+PORT=3000
+DATABASE_URL=postgresql://postgres:prod-password@db.prod.supabase.co:5432/postgres
+API_KEY=prod-api-key-67890
+NODE_ENV=production
+```
+
+<Tip>
+  Use environment-specific files and load them based on `NODE_ENV`. In production, use secret management services like **AWS Secrets Manager**, **HashiCorp Vault**, or **Vercel Environment Variables**.
+</Tip>
+
+## Vercel Environment Variables (for Deployment)
+
+When deploying to Vercel (as configured in the project):
+
+<Steps>
+  <Step title="Access Project Settings">
+    1. Open your Vercel dashboard
+    2. Select your project
+    3. Navigate to **Settings** → **Environment Variables**
+  </Step>
+
+  <Step title="Add Variables">
+    Add each environment variable:
+    - **Key**: `DATABASE_URL`
+    - **Value**: Your Supabase connection string
+    - **Environments**: Select Production, Preview, or Development
+  </Step>
+
+  <Step title="Redeploy">
+    Trigger a new deployment to apply the changes:
+
+    ```bash
+    git push origin main
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The project uses Terraform to automate Vercel project creation and environment variable synchronization. See `terraform/` directory for IaC configuration.
+</Note>
+
+## Docker Environment Configuration
+
+### Development Docker
+
+The development container uses the `.env` file:
+
+```bash
+docker run -p 3001:3001 --env-file .env --name nexusdev nexushotel:dev
+```
+
+### Production Docker
+
+For production, pass environment variables explicitly:
+
+```bash
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e API_KEY="your-production-key" \
+  --name nexusweb \
+  ssubaru/nexushotel:latest
+```
+
+Or use Docker Compose:
+
+```yaml compose.yaml
+services:
+  api:
+    image: ssubaru/nexushotel:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - API_KEY=${API_KEY}
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
+
+## Kubernetes Environment Variables
+
+For Kubernetes deployments using Helm:
+
+<Steps>
+  <Step title="Create Kubernetes Secret">
+    ```bash
+    kubectl create secret generic nexushotel-secrets \
+      --from-literal=DATABASE_URL="postgresql://..." \
+      --from-literal=API_KEY="your-api-key" \
+      -n nexushotel
+    ```
+  </Step>
+
+  <Step title="Reference in Deployment">
+    Helm charts automatically inject these secrets into pods. See `helm/` directory for configuration.
+  </Step>
+
+  <Step title="Verify">
+    ```bash
+    kubectl get secrets -n nexushotel
+    kubectl describe secret nexushotel-secrets -n nexushotel
+    ```
+  </Step>
+</Steps>
+
+## Verification
+
+Verify your environment is correctly configured:
+
+<Steps>
+  <Step title="Check Environment Variables">
+    ```bash
+    # Ensure .env file exists and has required variables
+    cat .env
+    ```
+
+    All required variables should be present and filled in.
+  </Step>
+
+  <Step title="Test Database Connection">
+    Start the development server:
+
+    ```bash
+    pnpm dev
+    ```
+
+    Check terminal output for database connection errors.
+  </Step>
+
+  <Step title="Access Application">
+    Open http://localhost:3001 in your browser. The application should load without errors.
+  </Step>
+
+  <Step title="Check Supabase Dashboard">
+    Verify in Supabase dashboard:
+    - Tables are created
+    - API requests appear in **Logs**
+    - No authentication errors
+  </Step>
+</Steps>
+
+## Security Best Practices
+
+<Warning>
+  Follow these security guidelines to protect sensitive data:
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Never Commit Secrets" icon="lock">
+    Keep `.env` files out of version control. They're in `.gitignore` by default.
+  </Card>
+
+  <Card title="Use Strong Passwords" icon="key">
+    Generate strong database passwords using password managers or secure generators.
+  </Card>
+
+  <Card title="Rotate Keys Regularly" icon="rotate">
+    Change API keys and database passwords periodically, especially after team changes.
+  </Card>
+
+  <Card title="Use Environment-Specific Keys" icon="shield">
+    Never reuse production credentials in development or staging.
+  </Card>
+</CardGroup>
+
+### Database Security
+
+- ✅ Enable Row Level Security (RLS) on all tables
+- ✅ Use parameterized queries to prevent SQL injection
+- ✅ Limit database user permissions to only what's needed
+- ✅ Enable SSL/TLS for database connections
+- ✅ Regularly backup your database (Supabase does this automatically)
+
+### API Security
+
+- ✅ Use HTTPS in production (enforced by Vercel)
+- ✅ Implement rate limiting on API endpoints
+- ✅ Validate and sanitize all user inputs
+- ✅ Use JWT tokens for authentication
+- ✅ Set appropriate CORS policies
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot connect to Supabase database">
+    **Possible causes:**
+    1. Incorrect `DATABASE_URL` in `.env`
+    2. Wrong database password (check for special characters)
+    3. Supabase project paused (free tier pauses after inactivity)
+    4. Network/firewall blocking connection
+
+    **Solutions:**
+    - Verify connection string in Supabase dashboard
+    - URL-encode special characters in password
+    - Wake up project by visiting Supabase dashboard
+    - Check firewall/VPN settings
+  </Accordion>
+
+  <Accordion title="Environment variables not loading">
+    **Solutions:**
+    1. Ensure `.env` file is in the root directory (not in `apps/web/`)
+    2. Restart development server after changing `.env`
+    3. Check for syntax errors (no spaces around `=`)
+    4. Use `process.env.VARIABLE_NAME` to access in code
+  </Accordion>
+
+  <Accordion title="Different behavior between development and production">
+    **Common causes:**
+    - Different environment variable values
+    - Missing variables in production
+    - NODE_ENV not set correctly
+
+    **Solutions:**
+    - Compare `.env.development` and production environment variables
+    - Check Vercel/deployment platform environment variables
+    - Ensure all required variables are set in production
+  </Accordion>
+
+  <Accordion title="pnpm version mismatch">
+    **Error**: `Expected version X, got version Y`
+
+    **Solution:**
+    ```bash
+    # Enable Corepack to auto-use correct version
+    corepack enable
+    corepack prepare pnpm@10.28.2 --activate
+    
+    # Or install specific version
+    npm install -g pnpm@10.28.2
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that your environment is configured:
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Start developing with the platform
+  </Card>
+  
+  <Card title="Local Development" icon="laptop-code" href="/local-development">
+    Learn about dev containers, hot reload, and debugging
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Supabase Documentation](https://supabase.com/docs)
+- [Next.js Environment Variables](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables)
+- [pnpm Documentation](https://pnpm.io/)
+- [Turborepo Documentation](https://turbo.build/repo/docs)
+- [Project Jira Board](https://hoteldevops.atlassian.net/jira/core/projects/NXS/calendar)

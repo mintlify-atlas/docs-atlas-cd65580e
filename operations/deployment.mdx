@@ -1,0 +1,248 @@
+---
+title: Deployment Procedures
+description: Deployment procedures and best practices for Nexus Hotel DevOps Platform
+---
+
+# Deployment Procedures
+
+This guide covers deployment procedures for the Nexus Hotel platform using Docker, Kubernetes, and Helm.
+
+## Deployment Architecture
+
+The Nexus Hotel platform uses a multi-stage deployment pipeline:
+
+- **Development Environment**: Docker with hot-reload capabilities
+- **Production Environment**: Kubernetes cluster managed by Helm
+- **CI/CD**: GitHub Actions for automated deployments
+- **Infrastructure**: Terraform for Infrastructure as Code (IaC)
+
+---
+
+## Docker Deployment
+
+### Development Environment
+
+The development environment is designed for rapid local development with hot-reloading.
+
+**Configuration:**
+- Port: `3001`
+- Dockerfile: `Dockerfile.dev`
+- Purpose: Local development and testing
+
+```bash
+# Build the development image
+docker build -f Dockerfile.dev -t nexushotel .
+
+# Run the development container
+docker run -p 3001:3001 --env-file .env --name nexusdev nexushotel
+```
+
+**Arguments Explained:**
+- `-p 3001:3001` - Maps port 3001 from host to container
+- `--env-file .env` - Loads environment variables from .env file
+- `--name nexusdev` - Assigns a name to the container
+
+### Production Environment
+
+The production environment uses multi-stage builds for optimized, lightweight images.
+
+**Configuration:**
+- Port: `3000`
+- Dockerfile: `Dockerfile`
+- Image: `ssubaru/nexushotel:latest`
+- Purpose: Production deployments
+
+#### Option A: Pre-built Image (Recommended)
+
+```bash
+docker run -p 3000:3000 --env-file .env --name nexusweb ssubaru/nexushotel:latest
+```
+
+#### Option B: Build Locally
+
+```bash
+docker compose up --build -d
+```
+
+This automatically:
+- Isolates the web app from the monorepo
+- Installs production dependencies
+- Compiles the Next.js project
+- Starts the server using `node:22-slim`
+
+---
+
+## Kubernetes Deployment
+
+### Helm Chart Structure
+
+The Helm chart is located in the `/helm` directory and includes:
+
+- **Deployment**: 3 replicas for high availability
+- **Service**: ClusterIP for internal exposure
+- **Ingress**: External access via Ingress Controller
+- **Namespace**: Isolated namespace `nexushotel`
+
+### Pre-Deployment Validation
+
+Always validate your Helm chart before deploying:
+
+```bash
+# Validate chart syntax
+helm lint ./helm
+
+# Preview generated manifests
+helm template nexushotel ./helm --set image.tag=latest
+```
+
+This helps:
+- Detect configuration errors
+- Review Kubernetes manifests before deployment
+- Prevent cluster failures
+
+### Manual Deployment
+
+Deploy or update the application manually:
+
+```bash
+helm upgrade --install nexushotel ./helm \
+  --namespace nexushotel \
+  --create-namespace \
+  --set image.tag=latest \
+  --wait
+```
+
+**What this command does:**
+- Installs the chart if it doesn't exist
+- Updates the deployment if already installed
+- Automatically creates the `nexushotel` namespace
+- Waits until all resources are ready
+
+### Deployment Verification
+
+Verify your deployment with kubectl:
+
+```bash
+# View all resources
+kubectl get all -n nexushotel
+
+# Check pod status
+kubectl get pods -n nexushotel
+
+# View deployment details
+kubectl describe deployment nexushotel-web -n nexushotel
+```
+
+### Exposing the Application
+
+For local testing (Docker Desktop/Minikube):
+
+```bash
+kubectl patch svc nexushotel-svc -n nexushotel -p '{"spec": {"type": "LoadBalancer"}}'
+```
+
+---
+
+## Continuous Deployment (CD)
+
+### GitHub Actions Pipeline
+
+The CD pipeline is configured in `.github/workflows/cd.yml` and triggers when:
+- Pull requests are merged to `main` or `master` branch
+
+**Pipeline Steps:**
+1. Checkout repository code
+2. Configure kubectl with cluster credentials
+3. Install Helm
+4. Build image tag from commit SHA
+5. Deploy to Kubernetes using `helm upgrade --install`
+
+### Required Secrets
+
+To enable automated deployments, configure this secret in GitHub:
+
+**Secret Name**: `KUBECONFIG`  
+**Location**: Settings → Secrets and variables → Actions  
+**Contents**: Kubernetes cluster credentials
+
+<Warning>
+Never commit KUBECONFIG or cluster credentials to version control. Always use GitHub Secrets or a secure secrets management solution.
+</Warning>
+
+---
+
+## Infrastructure as Code (Terraform)
+
+### Terraform Setup
+
+Terraform automates infrastructure provisioning for Vercel projects.
+
+**What Terraform Manages:**
+- Creates Vercel projects: `hotel-project-web` and `hotel-project-api`
+- Synchronizes Supabase environment variables
+- Ensures frontend and API use the same database
+- Maintains consistency across environments
+- Versions infrastructure as code
+
+### Terraform Commands
+
+All commands must be run from the `/terraform` directory:
+
+```bash
+cd terraform
+
+# Initialize Terraform plugins
+terraform init
+
+# Preview infrastructure changes
+terraform plan
+
+# Apply changes and create resources
+terraform apply
+```
+
+---
+
+## Best Practices
+
+### Image Management
+- Always tag images with commit SHA for traceability
+- Use `latest` only for development environments
+- Pull production images from trusted registries
+
+### Deployment Strategy
+- Use rolling updates for zero-downtime deployments
+- Configure resource requests and limits (see helm/values.yaml:deployment.mdx:39-46)
+- Maintain at least 3 replicas for high availability
+
+### Environment Variables
+- Store sensitive values in Kubernetes Secrets
+- Use `.env` files locally, never commit them
+- Synchronize environment variables via Terraform
+
+### Rollback Procedures
+
+If a deployment fails, rollback to the previous version:
+
+```bash
+# View deployment history
+helm history nexushotel -n nexushotel
+
+# Rollback to previous revision
+helm rollback nexushotel -n nexushotel
+```
+
+---
+
+## Deployment Checklist
+
+Before deploying to production:
+
+- [ ] Run `helm lint ./helm` to validate chart
+- [ ] Review generated manifests with `helm template`
+- [ ] Verify environment variables are configured
+- [ ] Check KUBECONFIG secret is configured in GitHub
+- [ ] Test deployment in staging environment first
+- [ ] Monitor logs during deployment
+- [ ] Verify application health after deployment
+- [ ] Document any configuration changes

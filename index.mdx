@@ -1,97 +1,130 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Nexus Hotel DevOps Platform"
+description: "Cloud-native hotel reservation platform demonstrating enterprise DevOps practices with Docker, Kubernetes, Terraform, and CI/CD pipelines"
 ---
 
-## Setting up
+## Welcome to Nexus Hotel
 
-Get your documentation site up and running in minutes.
+Nexus Hotel is a comprehensive DevOps platform showcasing modern cloud-native infrastructure and deployment practices. This project demonstrates how to build, deploy, and operate a production-ready hotel reservation system using industry-standard DevOps tools and methodologies.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
   >
-    Edit your docs locally and preview them in real time.
+    Get the platform running locally in minutes
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Architecture Overview"
+    icon="sitemap"
+    href="/architecture"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    Understand the system design and components
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
+    title="Deploy to Kubernetes"
+    icon="dharmachakra"
+    href="/infrastructure/kubernetes"
   >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+    Learn how to deploy with Kubernetes and Helm
   </Card>
   <Card
-    title="Code samples"
+    title="CI/CD Pipeline"
+    icon="code-branch"
+    href="/cicd/overview"
+  >
+    Explore automated deployment workflows
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Multi-Stage Docker Builds"
+    icon="docker"
+    href="/infrastructure/docker"
+  >
+    Separate development and production container configurations
+  </Card>
+  <Card
+    title="Kubernetes Orchestration"
+    icon="cloud"
+    href="/infrastructure/kubernetes"
+  >
+    High-availability deployment with 3-replica configuration
+  </Card>
+  <Card
+    title="Infrastructure as Code"
     icon="code"
-    href="/essentials/code"
+    href="/infrastructure/terraform"
   >
-    Add sample code to demonstrate how to use your product.
+    Terraform automation for Vercel project provisioning
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="GitHub Actions CI/CD"
+    icon="github"
+    href="/cicd/github-actions"
   >
-    Display images and other media.
+    Automated build, test, and deployment pipelines
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## What's Inside
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Accordion title="Frontend Application">
+  Next.js web application for hotel reservations including rooms, restaurants, and event spaces. Built with React 19, TypeScript, and Supabase integration.
+</Accordion>
+
+<Accordion title="API Service">
+  Lightweight API service built with srvx, providing backend functionality for the reservation platform.
+</Accordion>
+
+<Accordion title="Monorepo Architecture">
+  Turborepo-based monorepo with shared packages for UI components, TypeScript configurations, and ESLint rules.
+</Accordion>
+
+<Accordion title="Container Infrastructure">
+  Docker containerization with multi-stage builds, Docker Compose orchestration, and production-optimized images.
+</Accordion>
+
+<Accordion title="Kubernetes Deployment">
+  Complete Kubernetes manifests and Helm charts for deploying to production clusters with ingress, services, and deployments.
+</Accordion>
+
+<Accordion title="Terraform Automation">
+  Infrastructure as Code for provisioning Vercel projects and managing environment variables across deployments.
+</Accordion>
+
+## Getting Started
+
+<Steps>
+  <Step title="Clone the Repository">
+    Get the source code from GitHub:
+    ```bash
+    git clone https://github.com/PavoAyala/proyecto-de-devops.git
+    cd proyecto-de-devops
+    ```
+  </Step>
+  
+  <Step title="Set Up Environment">
+    Configure your environment variables:
+    ```bash
+    cp .env.example .env
+    # Edit .env with your Supabase credentials
+    ```
+  </Step>
+  
+  <Step title="Run Locally">
+    Start the development environment:
+    ```bash
+    pnpm install
+    pnpm dev
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Ready to dive deeper? Check out our [Quick Start Guide](/quickstart) for detailed setup instructions.
+</Note>

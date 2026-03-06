@@ -1,0 +1,526 @@
+---
+title: CLI Commands Reference
+description: Complete command reference for Docker, Kubernetes, Helm, Terraform, and pnpm
+---
+
+## Docker Commands
+
+### Development Environment
+
+```bash
+# Build development image
+docker build -f Dockerfile.dev -t nexushotel .
+
+# Run development container with hot-reload
+docker run -p 3001:3001 --env-file .env --name nexusdev nexushotel
+```
+
+### Production Environment
+
+```bash
+# Build production image
+docker build -t nexushotel .
+
+# Run production container
+docker run -p 3000:3000 --env-file .env --name nexusweb nexushotel
+
+# Use pre-built image from Docker Hub
+docker run -p 3000:3000 --env-file .env --name nexusweb ssubaru/nexushotel:latest
+```
+
+### Docker Compose
+
+```bash
+# Build and start services
+docker compose up --build -d
+
+# Stop services
+docker compose down
+
+# View logs
+docker compose logs -f
+
+# Rebuild specific service
+docker compose build api
+```
+
+### Container Management
+
+```bash
+# List running containers
+docker ps
+
+# List all containers
+docker ps -a
+
+# Stop container
+docker stop nexusweb
+
+# Remove container
+docker rm nexusweb
+
+# View container logs
+docker logs nexusweb
+
+# Follow logs in real-time
+docker logs -f nexusweb
+
+# Execute command in running container
+docker exec -it nexusweb sh
+```
+
+### Image Management
+
+```bash
+# List images
+docker images
+
+# Remove image
+docker rmi nexushotel
+
+# Pull image from registry
+docker pull ssubaru/nexushotel:latest
+
+# Tag image
+docker tag nexushotel ssubaru/nexushotel:v1.0
+
+# Push to Docker Hub
+docker push ssubaru/nexushotel:latest
+```
+
+### System Commands
+
+```bash
+# Remove unused data
+docker system prune
+
+# Remove unused images
+docker image prune -a
+
+# Show disk usage
+docker system df
+
+# Inspect container
+docker inspect nexusweb
+```
+
+## Kubernetes Commands
+
+### Resource Management
+
+```bash
+# Get all resources in namespace
+kubectl get all -n nexushotel
+
+# Get pods
+kubectl get pods -n nexushotel
+
+# Get services
+kubectl get svc -n nexushotel
+
+# Get deployments
+kubectl get deployments -n nexushotel
+
+# Get ingress
+kubectl get ingress -n nexushotel
+```
+
+### Logs and Debugging
+
+```bash
+# View application logs
+kubectl logs -n nexushotel -l app=nexushotel-web
+
+# Follow logs in real-time
+kubectl logs -n nexushotel -l app=nexushotel-web -f
+
+# Describe pod for troubleshooting
+kubectl describe pod <pod-name> -n nexushotel
+
+# Execute command in pod
+kubectl exec -it <pod-name> -n nexushotel -- sh
+```
+
+### Service Exposure
+
+```bash
+# Patch service to LoadBalancer (for local testing)
+kubectl patch svc nexushotel-svc -n nexushotel -p '{"spec": {"type": "LoadBalancer"}}'
+
+# Port forward for local access
+kubectl port-forward svc/nexushotel-svc 3000:80 -n nexushotel
+```
+
+### Namespace Management
+
+```bash
+# Create namespace
+kubectl create namespace nexushotel
+
+# Delete namespace and all resources
+kubectl delete namespace nexushotel
+
+# List all namespaces
+kubectl get namespaces
+```
+
+## Helm Commands
+
+### Chart Validation
+
+```bash
+# Validate chart syntax
+helm lint ./helm
+
+# Preview manifests without installing
+helm template nexushotel ./helm --set image.tag=latest
+
+# Dry-run installation
+helm install nexushotel ./helm --dry-run --debug
+```
+
+### Installation and Upgrades
+
+```bash
+# Install or upgrade chart
+helm upgrade --install nexushotel ./helm \
+  --namespace nexushotel \
+  --create-namespace \
+  --set image.tag=latest \
+  --wait
+
+# Install with custom values file
+helm upgrade --install nexushotel ./helm \
+  -f values-production.yaml
+
+# Override multiple values
+helm upgrade --install nexushotel ./helm \
+  --set image.tag=v1.2.3 \
+  --set replicaCount=5 \
+  --set ingress.host=nexushotel.com
+```
+
+### Release Management
+
+```bash
+# List installed releases
+helm list -n nexushotel
+
+# Get release status
+helm status nexushotel -n nexushotel
+
+# Get release values
+helm get values nexushotel -n nexushotel
+
+# Get all release info
+helm get all nexushotel -n nexushotel
+
+# View release history
+helm history nexushotel -n nexushotel
+```
+
+### Rollback and Deletion
+
+```bash
+# Rollback to previous release
+helm rollback nexushotel -n nexushotel
+
+# Rollback to specific revision
+helm rollback nexushotel 2 -n nexushotel
+
+# Uninstall release
+helm uninstall nexushotel -n nexushotel
+
+# Uninstall and keep history
+helm uninstall nexushotel -n nexushotel --keep-history
+```
+
+## Terraform Commands
+
+### Initialization
+
+```bash
+# Navigate to terraform directory
+cd terraform
+
+# Initialize Terraform and download providers
+terraform init
+
+# Upgrade providers to latest versions
+terraform init -upgrade
+```
+
+### Planning and Validation
+
+```bash
+# Validate configuration syntax
+terraform validate
+
+# Format configuration files
+terraform fmt
+
+# Preview changes before applying
+terraform plan
+
+# Save plan to file
+terraform plan -out=tfplan
+```
+
+### Applying Changes
+
+```bash
+# Apply changes (with confirmation)
+terraform apply
+
+# Apply without confirmation prompt
+terraform apply -auto-approve
+
+# Apply saved plan
+terraform apply tfplan
+
+# Apply with variable overrides
+terraform apply \
+  -var="vercel_api_token=your-token" \
+  -var="github_repo=user/repo"
+```
+
+### State Management
+
+```bash
+# Show current state
+terraform show
+
+# List resources in state
+terraform state list
+
+# Show specific resource
+terraform state show vercel_project.web
+
+# Refresh state from real infrastructure
+terraform refresh
+```
+
+### Destruction
+
+```bash
+# Destroy all resources (with confirmation)
+terraform destroy
+
+# Destroy without confirmation
+terraform destroy -auto-approve
+
+# Destroy specific resource
+terraform destroy -target=vercel_project.web
+```
+
+### Output and Inspection
+
+```bash
+# Show outputs
+terraform output
+
+# Show specific output
+terraform output web_project_url
+
+# Generate dependency graph
+terraform graph | dot -Tpng > graph.png
+```
+
+## pnpm Commands
+
+### Package Management
+
+```bash
+# Install all dependencies
+pnpm install
+
+# Install specific package
+pnpm add <package-name>
+
+# Install dev dependency
+pnpm add -D <package-name>
+
+# Update dependencies
+pnpm update
+
+# Remove package
+pnpm remove <package-name>
+```
+
+### Monorepo Commands
+
+```bash
+# Install dependencies (from root)
+pnpm install
+
+# Build all packages
+pnpm build
+
+# Build specific workspace
+pnpm --filter web build
+pnpm --filter api build
+
+# Run dev server for web app
+pnpm --filter web dev
+
+# Run dev server for all apps
+pnpm dev
+```
+
+### Turbo Commands
+
+```bash
+# Run build with Turbo
+pnpm turbo run build
+
+# Build specific workspace
+pnpm turbo run build --filter=web
+pnpm turbo run build --filter=api
+
+# Run dev with Turbo
+pnpm turbo run dev
+
+# Run with cache
+pnpm turbo run build --filter=web...
+```
+
+### Workspace-Specific Commands
+
+#### Web App (apps/web)
+
+```bash
+# Development (port 3001)
+pnpm --filter web dev
+
+# Production build
+pnpm --filter web build
+
+# Start production server
+pnpm --filter web start
+
+# Lint code
+pnpm --filter web lint
+
+# Type check
+pnpm --filter web check-types
+```
+
+#### API (apps/api)
+
+```bash
+# Development server
+pnpm --filter api dev
+
+# Build TypeScript
+pnpm --filter api build
+
+# Start production server
+pnpm --filter api start
+```
+
+### Utility Commands
+
+```bash
+# Format code with Prettier
+pnpm format
+
+# Run linting across all workspaces
+pnpm lint
+
+# Type check all workspaces
+pnpm check-types
+
+# Show workspace info
+pnpm -r exec pwd
+
+# List installed packages
+pnpm list
+
+# Show outdated packages
+pnpm outdated
+```
+
+## Combined Workflows
+
+### Local Development Workflow
+
+```bash
+# 1. Clone repository and install dependencies
+git clone <repository-url>
+cd proyecto-de-devops
+pnpm install
+
+# 2. Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your values
+
+# 3. Run development server
+pnpm --filter web dev
+# App runs on http://localhost:3001
+```
+
+### Docker Development Workflow
+
+```bash
+# 1. Build and run development container
+docker build -f Dockerfile.dev -t nexushotel .
+docker run -p 3001:3001 --env-file .env --name nexusdev nexushotel
+
+# 2. View logs
+docker logs -f nexusdev
+
+# 3. Stop when done
+docker stop nexusdev
+docker rm nexusdev
+```
+
+### Kubernetes Deployment Workflow
+
+```bash
+# 1. Validate Helm chart
+helm lint ./helm
+
+# 2. Preview manifests
+helm template nexushotel ./helm
+
+# 3. Deploy to cluster
+helm upgrade --install nexushotel ./helm \
+  --namespace nexushotel \
+  --create-namespace \
+  --wait
+
+# 4. Verify deployment
+kubectl get all -n nexushotel
+
+# 5. Check logs
+kubectl logs -n nexushotel -l app=nexushotel-web -f
+```
+
+### Infrastructure Provisioning Workflow
+
+```bash
+# 1. Navigate to terraform directory
+cd terraform
+
+# 2. Initialize Terraform
+terraform init
+
+# 3. Validate configuration
+terraform validate
+
+# 4. Preview changes
+terraform plan
+
+# 5. Apply infrastructure
+terraform apply
+
+# 6. Verify outputs
+terraform output
+```
+
+## Related Documentation
+
+- [Docker Reference](/reference/docker-reference)
+- [Helm Values](/reference/helm-values)
+- [Terraform Variables](/reference/terraform-variables)
+- [Environment Variables](/reference/environment-variables)

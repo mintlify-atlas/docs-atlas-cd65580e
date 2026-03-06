@@ -1,0 +1,268 @@
+---
+title: Helm Values Reference
+description: Complete Helm values.yaml documentation for Nexus Hotel Kubernetes deployment
+---
+
+## Overview
+
+The Helm chart for Nexus Hotel provides templated Kubernetes manifests with configurable values for flexible deployment across different environments.
+
+## Default Values
+
+All values can be overridden using `--set` flags or custom values files.
+
+### Image Configuration
+
+<ParamField path="image.repository" type="string" default="ssubaru/nexushotel">
+  Docker image repository for the application
+</ParamField>
+
+<ParamField path="image.tag" type="string" default="latest">
+  Docker image tag to deploy. Override with specific version tags in production.
+</ParamField>
+
+<ParamField path="image.pullPolicy" type="string" default="IfNotPresent">
+  Kubernetes image pull policy. Options: `Always`, `IfNotPresent`, `Never`
+</ParamField>
+
+### Application Configuration
+
+<ParamField path="appName" type="string" default="nexushotel-web">
+  Application name used for labels and resource naming
+</ParamField>
+
+<ParamField path="namespace" type="string" default="nexushotel">
+  Kubernetes namespace where resources will be deployed
+</ParamField>
+
+<ParamField path="replicaCount" type="number" default="3">
+  Number of pod replicas for high availability
+</ParamField>
+
+### Service Configuration
+
+<ParamField path="service.type" type="string" default="ClusterIP">
+  Kubernetes service type. Options: `ClusterIP`, `NodePort`, `LoadBalancer`
+</ParamField>
+
+<ParamField path="service.port" type="number" default="80">
+  Service port exposed within the cluster
+</ParamField>
+
+<ParamField path="service.targetPort" type="number" default="3000">
+  Container port where the application listens
+</ParamField>
+
+### Ingress Configuration
+
+<ParamField path="ingress.enabled" type="boolean" default="true">
+  Enable or disable Ingress resource creation
+</ParamField>
+
+<ParamField path="ingress.className" type="string" default="nginx">
+  Ingress controller class name
+</ParamField>
+
+<ParamField path="ingress.host" type="string" default="nexushotel.local">
+  Hostname for external access. **Must be changed for production deployments.**
+</ParamField>
+
+<ParamField path="ingress.annotations" type="object">
+  Ingress annotations for configuration
+  
+  ```yaml
+  nginx.ingress.kubernetes.io/rewrite-target: /
+  ```
+</ParamField>
+
+### Environment Variables
+
+<ParamField path="env.NODE_ENV" type="string" default="production">
+  Node.js environment mode
+</ParamField>
+
+<ParamField path="env.PORT" type="string" default="3000">
+  Application port (must match service.targetPort)
+</ParamField>
+
+### Resource Limits
+
+#### Requests
+
+<ParamField path="resources.requests.memory" type="string" default="256Mi">
+  Minimum memory allocated to each pod
+</ParamField>
+
+<ParamField path="resources.requests.cpu" type="string" default="100m">
+  Minimum CPU allocated to each pod (100 millicores = 0.1 CPU)
+</ParamField>
+
+#### Limits
+
+<ParamField path="resources.limits.memory" type="string" default="512Mi">
+  Maximum memory each pod can use before being terminated
+</ParamField>
+
+<ParamField path="resources.limits.cpu" type="string" default="500m">
+  Maximum CPU each pod can use (500 millicores = 0.5 CPU)
+</ParamField>
+
+## Complete values.yaml
+
+```yaml
+# Valores por defecto para el Helm Chart de Nexus Hotel
+# Estos valores pueden sobreescribirse con --set o -f values-override.yaml
+
+# Configuración de la imagen Docker
+image:
+  repository: ssubaru/nexushotel
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Número de réplicas del Deployment
+replicaCount: 3
+
+# Nombre de la aplicación (usado para labels y nombres de recursos)
+appName: nexushotel-web
+
+# Namespace donde se desplegará la aplicación
+namespace: nexushotel
+
+# Configuración del Service
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# Configuración del Ingress
+ingress:
+  enabled: true
+  className: nginx
+  host: nexushotel.local  # Cambiar al dominio real en producción
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+
+# Variables de entorno de la aplicación
+env:
+  NODE_ENV: production
+  PORT: "3000"
+
+# Recursos del contenedor
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+## Overriding Values
+
+### Using --set Flag
+
+```bash
+# Override single value
+helm upgrade --install nexushotel ./helm \
+  --set image.tag=v1.2.3
+
+# Override multiple values
+helm upgrade --install nexushotel ./helm \
+  --set image.tag=v1.2.3 \
+  --set replicaCount=5 \
+  --set ingress.host=nexushotel.com
+```
+
+### Using Custom Values File
+
+Create `values-production.yaml`:
+
+```yaml
+image:
+  tag: v1.2.3
+  pullPolicy: Always
+
+replicaCount: 5
+
+ingress:
+  host: nexushotel.com
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "200m"
+  limits:
+    memory: "1Gi"
+    cpu: "1000m"
+```
+
+Apply custom values:
+
+```bash
+helm upgrade --install nexushotel ./helm \
+  -f values-production.yaml
+```
+
+## Environment-Specific Configurations
+
+### Development
+
+```yaml
+replicaCount: 1
+ingress:
+  host: nexushotel.local
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "50m"
+```
+
+### Staging
+
+```yaml
+replicaCount: 2
+image:
+  tag: staging
+ingress:
+  host: staging.nexushotel.com
+```
+
+### Production
+
+```yaml
+replicaCount: 5
+image:
+  tag: v1.2.3
+  pullPolicy: Always
+ingress:
+  host: nexushotel.com
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "200m"
+  limits:
+    memory: "1Gi"
+    cpu: "1000m"
+```
+
+## Validation
+
+```bash
+# Validate chart syntax
+helm lint ./helm
+
+# Preview rendered templates
+helm template nexushotel ./helm
+
+# Preview with custom values
+helm template nexushotel ./helm -f values-production.yaml
+
+# Dry-run installation
+helm install nexushotel ./helm --dry-run --debug
+```
+
+## Related Resources
+
+- [Helm Commands](/reference/commands#helm-commands)
+- [Kubernetes Deployment Guide](/deployment/kubernetes)
+- [Environment Variables](/reference/environment-variables)

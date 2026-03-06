@@ -1,0 +1,645 @@
+---
+title: React Components
+description: Reusable React components in the Nexus Hotel frontend application
+---
+
+The frontend uses a collection of React components located in `apps/web/components/` for building the user interface.
+
+## Component Architecture
+
+All components follow these patterns:
+- TypeScript for type safety
+- CSS Modules for scoped styling
+- Functional components with React hooks
+- Props interfaces for clear contracts
+
+## Core Components
+
+### Navbar
+
+Navigation component with authentication modal integration.
+
+**Location:** `apps/web/components/Navbar/index.tsx`
+
+```tsx apps/web/components/Navbar/index.tsx
+'use client';
+
+import React, { useState } from 'react';
+import styles from './Navbar.module.css';
+import Button from '../Button';
+import AuthModal from '../AuthModal';
+
+const Navbar: React.FC = () => {
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+    return (
+        <>
+            <nav className={`${styles.navbar} glass`}>
+                <div className={`${styles.container} container`}>
+                    <a href="/" className={styles.logo}>
+                        <span className={styles.nexus}>NEXUS</span>
+                        <span className={styles.hotel}>HOTEL</span>
+                    </a>
+                    <ul className={styles.navLinks}>
+                        <li><a id="rooms" href="/habitaciones" className={styles.link}>Rooms</a></li>
+                        <li><a id="restaurant" href="/restaurantes" className={styles.link}>Restaurant</a></li>
+                        <li><a id="experiences" href="/experiences" className={styles.link}>Experiences</a></li>
+                    </ul>
+                    <div className={styles.actions}>
+                        <Button variant="outline">Book Now</Button>
+                        <Button variant="outline" onClick={() => setIsAuthModalOpen(true)}>Sign In</Button>
+                    </div>
+                </div>
+            </nav>
+            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+        </>
+    );
+};
+
+export default Navbar;
+```
+
+**Features:**
+- Client component with state management
+- Logo branding
+- Navigation links
+- Authentication integration
+- Glass morphism styling
+
+### Hero
+
+Hero section for landing page.
+
+**Location:** `apps/web/components/Hero/index.tsx`
+
+```tsx apps/web/components/Hero/index.tsx
+import React from 'react';
+import styles from './Hero.module.css';
+import Button from '../Button';
+
+const Hero: React.FC = () => {
+    return (
+        <section className={styles.hero}>
+            <div className={`${styles.container} container`}>
+                <div className={styles.content}>
+                    <h1 className={styles.title}>
+                        Experience <span className={styles.highlight}>Nexus Luxury</span>
+                    </h1>
+                    <p className={styles.subtitle}>
+                        Innovative digital booking for rooms, restaurant tables, and exclusive events.
+                    </p>
+                    <div className={styles.actions}>
+                        <Button variant="primary" className={styles.cta} href="habitaciones">
+                            Explore Rooms
+                        </Button>
+                        <Button variant="secondary" className={styles.cta} href="#restaurant">
+                            View Restaurant
+                        </Button>
+                    </div>
+                </div>
+            </div>
+            <div className={styles.overlay}></div>
+        </section>
+    );
+};
+
+export default Hero;
+```
+
+**Features:**
+- Compelling headline and description
+- Call-to-action buttons
+- Background overlay effect
+
+### Services
+
+Showcase of hotel services with cards.
+
+**Location:** `apps/web/components/Services/index.tsx`
+
+```tsx apps/web/components/Services/index.tsx
+import React from 'react';
+import styles from './Services.module.css';
+import Card from '../Card';
+import Button from '../Button';
+
+const Services: React.FC = () => {
+    const services = [
+        {
+            title: 'Luxury Rooms',
+            description: 'Find the perfect suite for your stay with a few clicks.',
+            image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39',
+            tag: 'Rooms'
+        },
+        {
+            title: 'Fine Dining',
+            description: 'Reserve your table at our world-class restaurant.',
+            image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4',
+            tag: 'Tables'
+        },
+        {
+            title: 'Grand Events',
+            description: 'Professional spaces for meetings, weddings, and celebrations.',
+            image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622',
+            tag: 'Spaces'
+        }
+    ];
+
+    return (
+        <section id="services" className={styles.services}>
+            <div className="container">
+                <div className={styles.header}>
+                    <h2 className={styles.headerTitle}>Exemplary Services</h2>
+                    <p className={styles.headerSubtitle}>
+                        Everything you need for an unforgettable experience.
+                    </p>
+                </div>
+                <div className={styles.grid}>
+                    {services.map((service) => (
+                        <Card
+                            key={service.title}
+                            title={service.title}
+                            description={service.description}
+                            image={service.image}
+                        >
+                            <Button variant="outline">Book {service.tag}</Button>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+};
+
+export default Services;
+```
+
+**Features:**
+- Data-driven service cards
+- Grid layout
+- Integration with Card and Button components
+
+### Features
+
+Highlight key platform features.
+
+**Location:** `apps/web/components/Features/index.tsx`
+
+```tsx apps/web/components/Features/index.tsx
+import React from 'react';
+import styles from './Features.module.css';
+
+const Features: React.FC = () => {
+    const features = [
+        {
+            title: 'Reliable Booking',
+            description: 'Our system guarantees your reservation without errors.',
+            icon: '🛡️'
+        },
+        {
+            title: 'Fast & Effortless',
+            description: 'Book your space in seconds through our intuitive interface.',
+            icon: '⚡'
+        },
+        {
+            title: 'Secure Payments',
+            description: 'Protected by industry-leading encryption and security protocols.',
+            icon: '🔒'
+        }
+    ];
+
+    return (
+        <section id="features" className={styles.features}>
+            <div className="container">
+                <div className={styles.grid}>
+                    {features.map((feature) => (
+                        <div key={feature.title} className={styles.feature}>
+                            <div className={styles.icon}>{feature.icon}</div>
+                            <h3 className={styles.featureTitle}>{feature.title}</h3>
+                            <p className={styles.featureDescription}>{feature.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+};
+
+export default Features;
+```
+
+**Features:**
+- Icon-based feature cards
+- Simple grid layout
+- Data-driven rendering
+
+### Footer
+
+Site footer with links and contact information.
+
+**Location:** `apps/web/components/Footer/index.tsx`
+
+```tsx apps/web/components/Footer/index.tsx
+import React from 'react';
+import styles from './Footer.module.css';
+
+const Footer: React.FC = () => {
+    return (
+        <footer className={styles.footer}>
+            <div className={`${styles.container} container`}>
+                <div className={styles.grid}>
+                    <div className={styles.info}>
+                        <div className={styles.logo}>
+                            <span className={styles.nexus}>NEXUS</span>
+                            <span className={styles.hotel}>HOTEL</span>
+                        </div>
+                        <p className={styles.description}>
+                            Innovative space booking for a modern world.
+                        </p>
+                    </div>
+                    <div className={styles.links}>
+                        <h4 className={styles.title}>Quick Links</h4>
+                        <ul className={styles.linkList}>
+                            <li><a href="/about">About Us</a></li>
+                            <li><a href="/services">Services</a></li>
+                            <li><a href="/security">Security</a></li>
+                            <li><a href="/contact">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div className={styles.contact}>
+                        <h4 className={styles.title}>Contact Info</h4>
+                        <div className={styles.contactInfo}>
+                            <p>123 Luxury Ave, Ocean City</p>
+                            <p>contact@nexushotel.com</p>
+                            <p>+1 (555) 123-4567</p>
+                        </div>
+                    </div>
+                </div>
+                <div className={styles.bottom}>
+                    <p>&copy; {new Date().getFullYear()} Nexus Hotel. All rights reserved.</p>
+                    <div className={styles.legal}>
+                        <a href="/privacy">Privacy Policy</a>
+                        <a href="/terms">Terms of Service</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    );
+};
+
+export default Footer;
+```
+
+**Features:**
+- Multi-column layout
+- Quick links
+- Contact information
+- Legal links
+- Dynamic copyright year
+
+## UI Components
+
+### Button
+
+Reusable button component with variants.
+
+**Location:** `apps/web/components/Button/index.tsx`
+
+```tsx apps/web/components/Button/index.tsx
+import React from 'react';
+import styles from './Button.module.css';
+
+interface ButtonProps {
+    children: React.ReactNode;
+    variant?: 'primary' | 'secondary' | 'outline';
+    onClick?: () => void;
+    className?: string;
+    href?: string;
+}
+
+const Button: React.FC<ButtonProps> = ({
+    children,
+    variant = 'primary',
+    onClick,
+    className = '',
+    href
+}) => {
+    const buttonClass = `${styles.button} ${styles[variant]} ${className}`;
+
+    if (href) {
+        return (
+            <a href={href} className={buttonClass}>
+                {children}
+            </a>
+        );
+    }
+
+    return (
+        <button className={buttonClass} onClick={onClick}>
+            {children}
+        </button>
+    );
+};
+
+export default Button;
+```
+
+**Props:**
+- `children`: Button content
+- `variant`: `'primary' | 'secondary' | 'outline'`
+- `onClick`: Click handler
+- `className`: Additional CSS classes
+- `href`: Link destination (renders as anchor)
+
+**Usage:**
+
+```tsx
+<Button variant="primary">Click Me</Button>
+<Button variant="outline" href="/page">Go to Page</Button>
+```
+
+### Card
+
+Flexible card component with optional image.
+
+**Location:** `apps/web/components/Card/index.tsx`
+
+```tsx apps/web/components/Card/index.tsx
+import React from 'react';
+import styles from './Card.module.css';
+
+interface CardProps {
+    title: string;
+    description: string;
+    icon?: React.ReactNode;
+    image?: string;
+    children?: React.ReactNode;
+    className?: string;
+}
+
+const Card: React.FC<CardProps> = ({
+    title,
+    description,
+    icon,
+    image,
+    children,
+    className = ''
+}) => {
+    return (
+        <div className={`glass ${styles.card} ${className}`}>
+            {image && (
+                <div className={styles.imageWrapper}>
+                    <img
+                        src={image}
+                        alt={title}
+                        className={styles.image}
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </div>
+            )}
+            <div className={styles.content}>
+                {icon && <div className={styles.icon}>{icon}</div>}
+                <h3 className={styles.title}>{title}</h3>
+                <p className={styles.description}>{description}</p>
+                {children}
+            </div>
+        </div>
+    );
+};
+
+export default Card;
+```
+
+**Props:**
+- `title`: Card title
+- `description`: Card description
+- `icon`: Optional icon element
+- `image`: Optional image URL
+- `children`: Additional content (e.g., buttons)
+- `className`: Additional CSS classes
+
+**Usage:**
+
+```tsx
+<Card
+  title="Luxury Rooms"
+  description="Find your perfect suite"
+  image="/room.jpg"
+>
+  <Button>Book Now</Button>
+</Card>
+```
+
+### AuthModal
+
+Authentication modal with sign-in and sign-up forms.
+
+**Location:** `apps/web/components/AuthModal/index.tsx`
+
+<Accordion title="View Full AuthModal Code">
+
+```tsx apps/web/components/AuthModal/index.tsx
+'use client';
+
+import React, { useState } from 'react';
+import styles from './AuthModal.module.css';
+import Button from '../Button';
+import { createSupabaseClient } from '../../utils/supabase/client';
+
+interface AuthModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+    const [isLogin, setIsLogin] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+
+    const supabase = createSupabaseClient();
+
+    if (!isOpen) return null;
+
+    const handleSignIn = async () => {
+        setLoading(true);
+        setError(null);
+
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        setLoading(false);
+
+        if (error) {
+            setError(error.message);
+        } else {
+            onClose();
+            window.location.reload();
+        }
+    };
+
+    const handleSignUp = async () => {
+        if (password !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: name,
+                },
+            },
+        });
+
+        setLoading(false);
+
+        if (error) {
+            setError(error.message);
+        } else {
+            setSuccess('Check your email to confirm your account!');
+        }
+    };
+
+    const handleGitHubSignIn = async () => {
+        setLoading(true);
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'github',
+            options: {
+                redirectTo: window.location.origin,
+            },
+        });
+        if (error) {
+            setLoading(false);
+            setError(error.message);
+        }
+    };
+
+    // ... rest of component
+};
+```
+
+</Accordion>
+
+**Features:**
+- Email/password authentication
+- OAuth (GitHub) integration
+- Sign-in and sign-up forms
+- Form validation
+- Error and success messaging
+- Loading states
+- Modal overlay with close on outside click
+
+**Props:**
+- `isOpen`: Controls modal visibility
+- `onClose`: Callback when modal closes
+
+## Component Organization
+
+```
+components/
+├── Navbar/
+│   ├── index.tsx
+│   └── Navbar.module.css
+├── Hero/
+│   ├── index.tsx
+│   └── Hero.module.css
+├── Services/
+│   ├── index.tsx
+│   └── Services.module.css
+├── Features/
+│   ├── index.tsx
+│   └── Features.module.css
+├── Footer/
+│   ├── index.tsx
+│   └── Footer.module.css
+├── Button/
+│   ├── index.tsx
+│   └── Button.module.css
+├── Card/
+│   ├── index.tsx
+│   └── Card.module.css
+└── AuthModal/
+    ├── index.tsx
+    └── AuthModal.module.css
+```
+
+## Styling Convention
+
+Each component uses CSS Modules for scoped styling:
+
+```tsx
+import styles from './Component.module.css';
+
+<div className={styles.container}>
+  <h1 className={styles.title}>Title</h1>
+</div>
+```
+
+## Import Patterns
+
+<Tabs>
+  <Tab title="Page Components">
+    ```tsx
+    import Navbar from '../components/Navbar';
+    import Hero from '../components/Hero';
+    import Footer from '../components/Footer';
+    ```
+  </Tab>
+  
+  <Tab title="UI Components">
+    ```tsx
+    import Button from '../Button';
+    import Card from '../Card';
+    ```
+  </Tab>
+  
+  <Tab title="Utilities">
+    ```tsx
+    import { createSupabaseClient } from '../../utils/supabase/client';
+    ```
+  </Tab>
+</Tabs>
+
+## Component Best Practices
+
+<CardGroup cols={2}>
+  <Card title="TypeScript" icon="code">
+    All components use TypeScript with explicit prop interfaces
+  </Card>
+  <Card title="CSS Modules" icon="paintbrush">
+    Scoped styling prevents class name conflicts
+  </Card>
+  <Card title="Client Directive" icon="browser">
+    Client components marked with 'use client' when needed
+  </Card>
+  <Card title="Lazy Loading" icon="image">
+    Images use lazy loading and async decoding
+  </Card>
+</CardGroup>
+
+## Related Documentation
+
+<CardGroup cols={3}>
+  <Card title="Frontend" icon="react" href="/app/frontend">
+    Next.js application overview
+  </Card>
+  <Card title="Database" icon="database" href="/app/database">
+    Supabase integration
+  </Card>
+  <Card title="Shared UI" icon="box" href="/app/shared-packages">
+    Shared UI package
+  </Card>
+</CardGroup>

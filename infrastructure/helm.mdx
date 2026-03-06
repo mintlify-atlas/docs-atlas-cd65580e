@@ -1,0 +1,654 @@
+---
+title: 'Helm Charts'
+description: 'Helm chart configuration for templated Kubernetes deployments'
+---
+
+## Overview
+
+The Nexus Hotel Helm chart provides a templated, configurable way to deploy the application to Kubernetes. It packages all Kubernetes manifests with customizable values for different environments and deployment scenarios.
+
+## Chart Information
+
+<ParamField path="name" type="string">
+  nexushotel
+</ParamField>
+
+<ParamField path="version" type="string">
+  0.1.0
+</ParamField>
+
+<ParamField path="appVersion" type="string">
+  1.0.0
+</ParamField>
+
+<ParamField path="type" type="string">
+  application
+</ParamField>
+
+<ParamField path="description" type="string">
+  Helm Chart para desplegar la aplicación web Nexus Hotel en Kubernetes
+</ParamField>
+
+## Chart Structure
+
+The Helm chart is organized in the `helm/` directory:
+
+```
+helm/
+├── Chart.yaml              # Chart metadata
+├── values.yaml             # Default configuration values
+└── templates/
+    ├── _helpers.tpl        # Template helpers and functions
+    ├── namespace.yaml      # Namespace template
+    ├── deployment.yaml     # Deployment template
+    ├── service.yaml        # Service template
+    └── ingress.yaml        # Ingress template
+```
+
+## Default Values
+
+The `values.yaml` file contains all configurable parameters:
+
+```yaml
+# Docker image configuration
+image:
+  repository: ssubaru/nexushotel
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Number of replicas
+replicaCount: 3
+
+# Application name
+appName: nexushotel-web
+
+# Namespace
+namespace: nexushotel
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  host: nexushotel.local
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+
+# Environment variables
+env:
+  NODE_ENV: production
+  PORT: "3000"
+
+# Resource limits
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+## Template Helpers
+
+The chart includes helper templates in `_helpers.tpl` for consistent labeling:
+
+### Full Name Helper
+
+```yaml
+{{- define "nexushotel.fullname" -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+```
+
+Generates a truncated release name for resource naming.
+
+### Common Labels Helper
+
+```yaml
+{{- define "nexushotel.labels" -}}
+app: {{ .Values.appName }}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+app.kubernetes.io/name: {{ .Values.appName }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Values.image.tag | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+```
+
+Provides consistent labels across all resources.
+
+### Selector Labels Helper
+
+```yaml
+{{- define "nexushotel.selectorLabels" -}}
+app: {{ .Values.appName }}
+app.kubernetes.io/name: {{ .Values.appName }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+```
+
+Defines selector labels for deployments and services.
+
+## Installation
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install Helm">
+    Ensure Helm 3.x is installed:
+    
+    ```bash
+    helm version
+    ```
+  </Step>
+  
+  <Step title="Kubernetes Access">
+    Configure kubectl to access your cluster:
+    
+    ```bash
+    kubectl cluster-info
+    ```
+  </Step>
+  
+  <Step title="NGINX Ingress">
+    Install NGINX Ingress Controller if not already available:
+    
+    ```bash
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm install nginx-ingress ingress-nginx/ingress-nginx
+    ```
+  </Step>
+</Steps>
+
+### Basic Installation
+
+<Tabs>
+  <Tab title="Default Values">
+    Install with default configuration:
+    
+    ```bash
+    # From the project root
+    helm install nexushotel ./helm
+    ```
+    
+    This creates a release named `nexushotel` with all default values.
+  </Tab>
+  
+  <Tab title="Custom Release Name">
+    Install with a custom release name:
+    
+    ```bash
+    helm install my-nexus-app ./helm
+    ```
+  </Tab>
+  
+  <Tab title="Dry Run">
+    Preview the manifests without installing:
+    
+    ```bash
+    helm install nexushotel ./helm --dry-run --debug
+    ```
+    
+    Useful for validating templates before deployment.
+  </Tab>
+</Tabs>
+
+## Customizing Values
+
+### Using --set Flag
+
+Override individual values during installation:
+
+```bash
+# Change image tag and replica count
+helm install nexushotel ./helm \
+  --set image.tag=v2.0.0 \
+  --set replicaCount=5
+
+# Update ingress host
+helm install nexushotel ./helm \
+  --set ingress.host=app.nexushotel.com
+
+# Change resource limits
+helm install nexushotel ./helm \
+  --set resources.limits.memory=1Gi \
+  --set resources.limits.cpu=1000m
+```
+
+### Using Custom Values File
+
+Create environment-specific values files:
+
+<CodeGroup>
+```yaml values-dev.yaml
+image:
+  repository: nexushotel-web
+  tag: dev
+  pullPolicy: Always
+
+replicaCount: 1
+
+ingress:
+  host: dev.nexushotel.local
+
+env:
+  NODE_ENV: development
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "50m"
+  limits:
+    memory: "256Mi"
+    cpu: "200m"
+```
+
+```yaml values-prod.yaml
+image:
+  repository: ssubaru/nexushotel
+  tag: v1.0.0
+  pullPolicy: IfNotPresent
+
+replicaCount: 5
+
+ingress:
+  host: app.nexushotel.com
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: nexushotel-tls
+
+env:
+  NODE_ENV: production
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+  limits:
+    memory: "1Gi"
+    cpu: "1000m"
+```
+
+```yaml values-staging.yaml
+image:
+  repository: ssubaru/nexushotel
+  tag: staging
+  pullPolicy: Always
+
+replicaCount: 2
+
+namespace: nexushotel-staging
+
+ingress:
+  host: staging.nexushotel.com
+
+env:
+  NODE_ENV: production
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+</CodeGroup>
+
+Install with custom values:
+
+```bash
+# Development environment
+helm install nexushotel-dev ./helm -f values-dev.yaml
+
+# Production environment
+helm install nexushotel-prod ./helm -f values-prod.yaml
+
+# Staging environment
+helm install nexushotel-staging ./helm -f values-staging.yaml
+```
+
+<Tip>
+You can combine multiple values files and --set flags. Values are merged in order, with later values taking precedence:
+
+```bash
+helm install nexushotel ./helm \
+  -f values-prod.yaml \
+  -f values-secrets.yaml \
+  --set image.tag=v2.1.0
+```
+</Tip>
+
+## Managing Releases
+
+### List Releases
+
+```bash
+# List all releases in current namespace
+helm list
+
+# List releases in all namespaces
+helm list --all-namespaces
+
+# List releases with specific status
+helm list --deployed
+helm list --failed
+```
+
+### Check Release Status
+
+```bash
+# Get release status
+helm status nexushotel
+
+# Show release values
+helm get values nexushotel
+
+# Show all computed values
+helm get values nexushotel --all
+
+# Get release manifest
+helm get manifest nexushotel
+```
+
+### Upgrade Release
+
+Update an existing release with new values or chart version:
+
+```bash
+# Upgrade with new values
+helm upgrade nexushotel ./helm \
+  --set image.tag=v2.0.0
+
+# Upgrade with values file
+helm upgrade nexushotel ./helm -f values-prod.yaml
+
+# Upgrade with atomic rollback on failure
+helm upgrade nexushotel ./helm \
+  --atomic \
+  --timeout 5m
+
+# Force upgrade (recreate resources)
+helm upgrade nexushotel ./helm --force
+```
+
+<Note>
+Helm upgrades perform rolling updates by default, ensuring zero downtime.
+</Note>
+
+### Rollback Release
+
+Revert to a previous release version:
+
+```bash
+# View release history
+helm history nexushotel
+
+# Rollback to previous version
+helm rollback nexushotel
+
+# Rollback to specific revision
+helm rollback nexushotel 3
+
+# Rollback with cleanup on failure
+helm rollback nexushotel --cleanup-on-fail
+```
+
+### Uninstall Release
+
+Remove a release and its resources:
+
+```bash
+# Uninstall release
+helm uninstall nexushotel
+
+# Uninstall and keep history for rollback
+helm uninstall nexushotel --keep-history
+
+# Uninstall from specific namespace
+helm uninstall nexushotel -n nexushotel
+```
+
+## Configuration Reference
+
+### Image Configuration
+
+<ParamField path="image.repository" type="string" default="ssubaru/nexushotel">
+  Docker image repository
+</ParamField>
+
+<ParamField path="image.tag" type="string" default="latest">
+  Image tag or version
+</ParamField>
+
+<ParamField path="image.pullPolicy" type="string" default="IfNotPresent">
+  Image pull policy: `Always`, `IfNotPresent`, or `Never`
+</ParamField>
+
+### Deployment Configuration
+
+<ParamField path="replicaCount" type="number" default="3">
+  Number of pod replicas
+</ParamField>
+
+<ParamField path="appName" type="string" default="nexushotel-web">
+  Application name used for labels and selectors
+</ParamField>
+
+<ParamField path="namespace" type="string" default="nexushotel">
+  Kubernetes namespace for deployment
+</ParamField>
+
+### Service Configuration
+
+<ParamField path="service.type" type="string" default="ClusterIP">
+  Service type: `ClusterIP`, `NodePort`, or `LoadBalancer`
+</ParamField>
+
+<ParamField path="service.port" type="number" default="80">
+  External service port
+</ParamField>
+
+<ParamField path="service.targetPort" type="number" default="3000">
+  Container port to forward traffic to
+</ParamField>
+
+### Ingress Configuration
+
+<ParamField path="ingress.enabled" type="boolean" default="true">
+  Enable or disable ingress creation
+</ParamField>
+
+<ParamField path="ingress.className" type="string" default="nginx">
+  Ingress class name
+</ParamField>
+
+<ParamField path="ingress.host" type="string" default="nexushotel.local">
+  Hostname for ingress routing
+</ParamField>
+
+<ParamField path="ingress.annotations" type="object">
+  Ingress annotations for controller configuration
+</ParamField>
+
+### Environment Variables
+
+<ParamField path="env.NODE_ENV" type="string" default="production">
+  Node.js environment mode
+</ParamField>
+
+<ParamField path="env.PORT" type="string" default="3000">
+  Application port
+</ParamField>
+
+### Resource Configuration
+
+<ParamField path="resources.requests.memory" type="string" default="256Mi">
+  Minimum memory request
+</ParamField>
+
+<ParamField path="resources.requests.cpu" type="string" default="100m">
+  Minimum CPU request
+</ParamField>
+
+<ParamField path="resources.limits.memory" type="string" default="512Mi">
+  Maximum memory limit
+</ParamField>
+
+<ParamField path="resources.limits.cpu" type="string" default="500m">
+  Maximum CPU limit
+</ParamField>
+
+## Advanced Usage
+
+### Disabling Ingress
+
+If you don't need external access:
+
+```bash
+helm install nexushotel ./helm --set ingress.enabled=false
+```
+
+### Using LoadBalancer Service
+
+For cloud environments with load balancer support:
+
+```bash
+helm install nexushotel ./helm \
+  --set service.type=LoadBalancer \
+  --set ingress.enabled=false
+```
+
+### Multiple Environments in Same Cluster
+
+Deploy to different namespaces:
+
+```bash
+# Development
+helm install nexushotel-dev ./helm \
+  --set namespace=nexushotel-dev \
+  --set ingress.host=dev.nexushotel.com
+
+# Staging
+helm install nexushotel-staging ./helm \
+  --set namespace=nexushotel-staging \
+  --set ingress.host=staging.nexushotel.com
+
+# Production
+helm install nexushotel-prod ./helm \
+  --set namespace=nexushotel-prod \
+  --set ingress.host=app.nexushotel.com
+```
+
+## Testing Charts
+
+### Validate Templates
+
+```bash
+# Lint chart for issues
+helm lint ./helm
+
+# Validate with specific values
+helm lint ./helm -f values-prod.yaml
+
+# Render templates locally
+helm template nexushotel ./helm
+
+# Render with custom values
+helm template nexushotel ./helm -f values-prod.yaml
+```
+
+### Dry Run Installation
+
+```bash
+# Preview what will be installed
+helm install nexushotel ./helm --dry-run --debug
+
+# Test upgrade
+helm upgrade nexushotel ./helm --dry-run --debug
+```
+
+## Best Practices
+
+<Warning>
+**Production Deployment Checklist:**
+
+1. **Version Pinning**: Use specific image tags instead of `latest`
+2. **Resource Limits**: Set appropriate CPU and memory limits based on load testing
+3. **Health Checks**: Add liveness and readiness probes to templates
+4. **Secrets Management**: Never commit sensitive values; use `--set` or sealed secrets
+5. **TLS Configuration**: Enable HTTPS with proper certificates
+6. **Backup Values**: Store production values files securely
+7. **Chart Versioning**: Increment chart version for tracking changes
+</Warning>
+
+<Tip>
+**Optimization Tips:**
+
+- Use `--atomic` flag for safe upgrades with automatic rollback
+- Test changes with `--dry-run` before applying
+- Leverage multiple values files for environment separation
+- Use chart dependencies for complex applications
+- Store charts in a Helm repository for version control
+- Document custom values in comments
+</Tip>
+
+## Troubleshooting
+
+### Installation Fails
+
+```bash
+# Check chart for errors
+helm lint ./helm
+
+# View detailed debug output
+helm install nexushotel ./helm --debug
+
+# Check Kubernetes events
+kubectl get events -n nexushotel --sort-by='.lastTimestamp'
+```
+
+### Upgrade Issues
+
+```bash
+# Compare current and new values
+helm get values nexushotel
+helm get values nexushotel --all
+
+# Check release history
+helm history nexushotel
+
+# Rollback if needed
+helm rollback nexushotel
+```
+
+### Template Rendering Errors
+
+```bash
+# Test template rendering
+helm template nexushotel ./helm --debug
+
+# Validate specific template
+helm template nexushotel ./helm -s templates/deployment.yaml
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Kubernetes" icon="dharmachakra" href="/infrastructure/kubernetes">
+    Learn about raw Kubernetes manifests
+  </Card>
+  
+  <Card title="Terraform" icon="code" href="/infrastructure/terraform">
+    Automate infrastructure provisioning
+  </Card>
+</CardGroup>

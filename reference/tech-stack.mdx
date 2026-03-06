@@ -1,0 +1,502 @@
+---
+title: Technology Stack
+description: Complete technology stack and architecture details for Nexus Hotel platform
+---
+
+## Overview
+
+Nexus Hotel is built using modern DevOps practices with a focus on security, availability, and continuous deployment. The platform leverages a comprehensive technology stack across frontend, backend, infrastructure, and operations.
+
+## Frontend Stack
+
+### Next.js 16.0.10
+
+<ParamField path="Framework" type="Next.js" default="16.0.10">
+  React-based framework with server-side rendering, static site generation, and API routes
+</ParamField>
+
+**Features Used:**
+- App Router (Next.js 13+ architecture)
+- Turbopack for fast development builds
+- Server Components
+- Automatic code splitting
+- Built-in optimization
+
+**Configuration:**
+- Development port: `3001`
+- Production port: `3000`
+- Build output: `.next/`
+
+### React 19.2.1
+
+<ParamField path="UI Library" type="React" default="19.2.1">
+  JavaScript library for building user interfaces
+</ParamField>
+
+**Features:**
+- Functional components with Hooks
+- Concurrent features
+- Automatic batching
+- Server Components support
+
+### TypeScript 5.8.3
+
+<ParamField path="Language" type="TypeScript" default="5.8.3">
+  Typed superset of JavaScript for enhanced developer experience and code quality
+</ParamField>
+
+**Benefits:**
+- Static type checking
+- Enhanced IDE support
+- Refactoring safety
+- Better documentation through types
+
+## Backend Stack
+
+### Node.js 22.x
+
+<ParamField path="Runtime" type="Node.js" default="22.x">
+  JavaScript runtime built on Chrome's V8 engine
+</ParamField>
+
+**Features:**
+- ES modules support
+- Latest JavaScript features
+- Performance optimizations
+- Long-term support (LTS)
+
+### srvx
+
+<ParamField path="API Framework" type="srvx" default="0.8.7">
+  Lightweight server framework for the API application
+</ParamField>
+
+**Usage:**
+- Development server: `srvx`
+- Production server: `srvx dist/index.js`
+
+## Database & Backend Services
+
+### Supabase
+
+<ParamField path="Backend as a Service" type="Supabase">
+  Open-source Firebase alternative for database, authentication, and real-time features
+</ParamField>
+
+**Features Used:**
+- PostgreSQL database
+- User authentication
+- Row Level Security (RLS)
+- Real-time subscriptions
+- RESTful API
+
+**Integration:**
+- Client library: `@supabase/supabase-js` v2.94.0
+- Environment variables:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+**Purpose:**
+- Stores reservation data
+- Manages user authentication
+- Handles customer information securely
+
+## Build System & Monorepo
+
+### pnpm 10.28.2
+
+<ParamField path="Package Manager" type="pnpm" default="10.28.2">
+  Fast, disk space efficient package manager
+</ParamField>
+
+**Advantages:**
+- Faster installation than npm/yarn
+- Efficient disk space usage through hard links
+- Strict dependency resolution
+- Built-in monorepo support
+
+**Configuration:**
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - 'apps/*'
+  - 'packages/*'
+```
+
+### Turbo 2.5.5
+
+<ParamField path="Build System" type="Turborepo" default="2.5.5">
+  High-performance build system for JavaScript and TypeScript monorepos
+</ParamField>
+
+**Features:**
+- Intelligent build caching
+- Parallel task execution
+- Dependency graph awareness
+- Remote caching support
+
+**Tasks Configured:**
+```json
+{
+  "build": { "dependsOn": ["^build"] },
+  "dev": { "cache": false, "persistent": true },
+  "lint": { "dependsOn": ["^lint"] },
+  "check-types": { "dependsOn": ["^check-types"] }
+}
+```
+
+## Containerization
+
+### Docker
+
+<ParamField path="Container Platform" type="Docker">
+  Platform for developing, shipping, and running applications in containers
+</ParamField>
+
+**Images:**
+
+#### Production Image
+- **Base:** `node:22-slim`
+- **Build Strategy:** Multi-stage
+- **Registry:** Docker Hub
+- **Repository:** `ssubaru/nexushotel`
+- **Tag:** `latest`
+
+**Build Stages:**
+1. **base** - pnpm setup
+2. **builder** - Turbo workspace pruning
+3. **installer** - Dependency installation
+4. **runner** - Minimal production runtime
+
+#### Development Image
+- **Base:** `node:22-slim`
+- **Features:** Hot-reload, dev tools
+- **Port:** `3001`
+
+### Docker Compose
+
+<ParamField path="Orchestration" type="Docker Compose">
+  Tool for defining and running multi-container Docker applications
+</ParamField>
+
+**Services Defined:**
+- `api` - Production build of the application
+
+## Kubernetes & Orchestration
+
+### Kubernetes
+
+<ParamField path="Container Orchestration" type="Kubernetes">
+  Production-grade container orchestration system
+</ParamField>
+
+**Resources Deployed:**
+- **Namespace:** `nexushotel`
+- **Deployment:** 3 replicas for high availability
+- **Service:** ClusterIP on port 80
+- **Ingress:** nginx ingress controller
+
+**Resource Limits (per pod):**
+```yaml
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+### Helm 3
+
+<ParamField path="Package Manager" type="Helm">
+  Package manager for Kubernetes applications
+</ParamField>
+
+**Chart Components:**
+- Deployment template
+- Service template
+- Ingress template
+- Namespace template
+- Helper functions
+
+**Configuration:**
+- Chart location: `/helm`
+- Release name: `nexushotel`
+- Namespace: `nexushotel`
+
+## Infrastructure as Code
+
+### Terraform
+
+<ParamField path="IaC Tool" type="Terraform">
+  Infrastructure as code tool for building, changing, and versioning infrastructure
+</ParamField>
+
+**Provider:**
+```hcl
+vercel = {
+  source  = "vercel/vercel"
+  version = "~> 1.0"
+}
+```
+
+**Resources Managed:**
+- Vercel projects (`hotel-project-web`, `hotel-project-api`)
+- Environment variables
+- Git repository integration
+- Build configurations
+
+**Benefits:**
+- Automated infrastructure provisioning
+- Version-controlled infrastructure
+- Consistent environment setup
+- Reproducible deployments
+
+## Deployment Platforms
+
+### Vercel
+
+<ParamField path="Deployment Platform" type="Vercel">
+  Cloud platform for static sites and serverless functions
+</ParamField>
+
+**Projects:**
+1. **hotel-project-web**
+   - Framework: Next.js
+   - Root: `apps/web`
+   - Build: `npx turbo run build --filter=web`
+
+2. **hotel-project-api**
+   - Root: `apps/api`
+   - Build: `npx turbo run build --filter=api`
+   - Output: `dist`
+
+**Features:**
+- Automatic deployments from Git
+- Preview deployments for PRs
+- Edge network CDN
+- Serverless functions
+
+## CI/CD Pipeline
+
+### GitHub Actions
+
+<ParamField path="CI/CD" type="GitHub Actions">
+  Automation platform for building, testing, and deploying code
+</ParamField>
+
+**Workflows:**
+
+#### Continuous Deployment (`cd.yml`)
+- **Trigger:** Push to `main`/`master` branch
+- **Steps:**
+  1. Fetch latest Docker image
+  2. Update Helm chart
+  3. Deploy to Kubernetes cluster
+
+**Required Secrets:**
+- `KUBECONFIG` - Kubernetes cluster credentials
+
+## Monitoring & Observability
+
+### Grafana
+
+<ParamField path="Monitoring" type="Grafana">
+  Analytics and monitoring platform
+</ParamField>
+
+**Purpose:**
+- Monitor application performance
+- Track system health metrics
+- Visualize deployment status
+- Alert on anomalies
+
+## Development Tools
+
+### Code Quality
+
+| Tool | Version | Purpose |
+|------|---------|----------|
+| **ESLint** | 9.31.0 | JavaScript/TypeScript linting |
+| **Prettier** | 3.6.2 | Code formatting |
+| **TypeScript Compiler** | 5.8.3 | Type checking |
+
+### Shared Configurations
+
+- `@repo/eslint-config` - Shared ESLint rules
+- `@repo/typescript-config` - Shared tsconfig.json
+
+## Security Stack
+
+### Authentication & Authorization
+
+- **Provider:** Supabase Auth
+- **Features:**
+  - User authentication
+  - Row Level Security (RLS)
+  - JWT tokens
+  - Password encryption
+
+### Data Protection
+
+- **Database:** PostgreSQL with RLS
+- **API Keys:** Environment variable management
+- **Secrets Management:** Terraform sensitive variables
+- **Network Security:** Kubernetes network policies
+
+### DevOps Security Practices
+
+<Check>
+  Automated security scanning in CI/CD
+</Check>
+
+<Check>
+  Sensitive data in environment variables, never in code
+</Check>
+
+<Check>
+  Container image scanning
+</Check>
+
+<Check>
+  Least privilege access controls
+</Check>
+
+## Version Control
+
+### Git
+
+<ParamField path="VCS" type="Git">
+  Distributed version control system
+</ParamField>
+
+**Repository:**
+- Default: `PavoAyala/proyecto-de-devops`
+- Platform: GitHub
+- Branching: GitFlow-style with `main`/`master`
+
+## Architecture Summary
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    End Users                         │
+└────────────────┬────────────────────────────────────┘
+                 │
+         ┌───────┴────────┐
+         │                │
+    ┌────▼─────┐    ┌────▼─────┐
+    │  Vercel  │    │   K8s    │
+    │ (Web/API)│    │ (Docker) │
+    └────┬─────┘    └────┬─────┘
+         │               │
+         │    ┌──────────┴──────────┐
+         │    │                     │
+         │    │   Load Balancer     │
+         │    │   (Ingress/nginx)   │
+         │    │                     │
+         │    └──────────┬──────────┘
+         │               │
+         │    ┌──────────▼──────────┐
+         │    │                     │
+         │    │  Pods (3 replicas)  │
+         │    │  nexushotel-web     │
+         │    │                     │
+         │    └──────────┬──────────┘
+         │               │
+         └───────────────┼───────────┐
+                         │           │
+                    ┌────▼────┐ ┌───▼────┐
+                    │Supabase │ │Grafana │
+                    │   DB    │ │Monitor │
+                    └─────────┘ └────────┘
+```
+
+## DevOps Methodology
+
+### Continuous Integration
+
+- Automated testing on pull requests
+- Code quality checks (ESLint, TypeScript)
+- Docker image building
+- Vulnerability scanning
+
+### Continuous Deployment
+
+- Automated deployment to Kubernetes
+- Helm-based rollouts
+- Zero-downtime deployments
+- Automatic rollback on failure
+
+### Infrastructure as Code
+
+- Terraform for cloud resources
+- Helm charts for Kubernetes
+- Version-controlled configurations
+- Reproducible environments
+
+## Scalability Features
+
+<Check>
+  **Horizontal Pod Autoscaling** - 3 replicas minimum
+</Check>
+
+<Check>
+  **Load Balancing** - Kubernetes Service + Ingress
+</Check>
+
+<Check>
+  **CDN** - Vercel Edge Network
+</Check>
+
+<Check>
+  **Database** - Supabase managed PostgreSQL
+</Check>
+
+## High Availability
+
+| Component | HA Strategy |
+|-----------|-------------|
+| **Web App** | 3 Kubernetes replicas |
+| **Database** | Supabase managed backups |
+| **Deployment** | Rolling updates with health checks |
+| **Network** | Multiple availability zones |
+
+## Technology Decision Rationale
+
+### Why Next.js?
+
+- Server-side rendering for SEO
+- Excellent developer experience
+- Built-in optimizations
+- Vercel deployment integration
+
+### Why Kubernetes?
+
+- High availability (3 replicas)
+- Auto-scaling capabilities
+- Industry-standard orchestration
+- Declarative configuration
+
+### Why Terraform?
+
+- Infrastructure versioning
+- Automated provisioning
+- Multi-cloud support
+- State management
+
+### Why Supabase?
+
+- Open-source
+- PostgreSQL reliability
+- Built-in authentication
+- Real-time capabilities
+- Row-level security
+
+## Related Documentation
+
+- [Project Structure](/reference/project-structure)
+- [Docker Reference](/reference/docker-reference)
+- [Helm Values](/reference/helm-values)
+- [Terraform Variables](/reference/terraform-variables)
+- [Commands Reference](/reference/commands)

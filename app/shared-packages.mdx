@@ -1,0 +1,637 @@
+---
+title: Shared Packages
+description: Reusable packages shared across the Nexus Hotel monorepo
+---
+
+The monorepo includes several shared packages in `packages/` that provide common functionality across applications.
+
+## Package Overview
+
+<CardGroup cols={2}>
+  <Card title="@repo/ui" icon="palette">
+    Shared React UI components
+  </Card>
+  <Card title="@repo/constants" icon="hashtag">
+    Shared constants and configuration
+  </Card>
+  <Card title="@repo/eslint-config" icon="code-simple">
+    ESLint configurations
+  </Card>
+  <Card title="@repo/typescript-config" icon="code">
+    TypeScript configurations
+  </Card>
+</CardGroup>
+
+## @repo/ui
+
+Shared React components for use across applications.
+
+**Location:** `packages/ui/`
+
+### Package Configuration
+
+```json packages/ui/package.json
+{
+  "name": "@repo/ui",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./*": "./src/*.tsx"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "generate:component": "turbo gen react-component",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.1",
+    "eslint": "^9.31.0",
+    "typescript": "5.8.2"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
+```
+
+### Components
+
+#### Button Component
+
+**Location:** `packages/ui/src/button.tsx`
+
+```tsx packages/ui/src/button.tsx
+"use client";
+
+import { ReactNode } from "react";
+
+interface ButtonProps {
+  children: ReactNode;
+  className?: string;
+  appName: string;
+}
+
+export const Button = ({ children, className, appName }: ButtonProps) => {
+  return (
+    <button
+      className={className}
+      onClick={() => alert(`Hello from your ${appName} app!`)}
+    >
+      {children}
+    </button>
+  );
+};
+```
+
+**Usage:**
+
+```tsx
+import { Button } from '@repo/ui/button'
+
+<Button appName="web" className="btn-primary">
+  Click Me
+</Button>
+```
+
+#### Card Component
+
+**Location:** `packages/ui/src/card.tsx`
+
+```tsx packages/ui/src/card.tsx
+import { type JSX } from "react";
+
+export function Card({
+  className,
+  title,
+  children,
+  href,
+}: {
+  className?: string;
+  title: string;
+  children: React.ReactNode;
+  href: string;
+}): JSX.Element {
+  return (
+    <a
+      className={className}
+      href={`${href}?utm_source=create-turbo&utm_medium=basic&utm_campaign=create-turbo"`}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      <h2>
+        {title} <span>-&gt;</span>
+      </h2>
+      <p>{children}</p>
+    </a>
+  );
+}
+```
+
+**Usage:**
+
+```tsx
+import { Card } from '@repo/ui/card'
+
+<Card
+  title="Documentation"
+  href="https://turbo.build/repo"
+  className="card"
+>
+  Learn about Turborepo
+</Card>
+```
+
+#### Code Component
+
+**Location:** `packages/ui/src/code.tsx`
+
+```tsx packages/ui/src/code.tsx
+import { type JSX } from "react";
+
+export function Code({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}): JSX.Element {
+  return <code className={className}>{children}</code>;
+}
+```
+
+**Usage:**
+
+```tsx
+import { Code } from '@repo/ui/code'
+
+<p>
+  Run <Code>pnpm dev</Code> to start development.
+</p>
+```
+
+### Exports Pattern
+
+The package uses wildcard exports:
+
+```json
+"exports": {
+  "./*": "./src/*.tsx"
+}
+```
+
+This allows importing any component:
+
+```tsx
+import { Button } from '@repo/ui/button'
+import { Card } from '@repo/ui/card'
+import { Code } from '@repo/ui/code'
+```
+
+### Component Generation
+
+Create new components using Turbo generators:
+
+```bash
+cd packages/ui
+pnpm generate:component
+```
+
+## @repo/constants
+
+Shared constants and configuration values.
+
+**Location:** `packages/constants/`
+
+### Package Configuration
+
+```json packages/constants/package.json
+{
+  "name": "@repo/constants",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.8.3"
+  }
+}
+```
+
+### Constants
+
+**Location:** `packages/constants/src/constants.ts`
+
+```typescript packages/constants/src/constants.ts
+export const CONSTANT = 'Hello from your Hono API!'
+```
+
+### Usage
+
+Import constants in any application:
+
+<Tabs>
+  <Tab title="API">
+    ```typescript apps/api/src/index.ts
+    import { CONSTANT } from '@repo/constants'
+    
+    export default {
+      fetch: () => new Response(CONSTANT)
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Frontend">
+    ```tsx
+    import { CONSTANT } from '@repo/constants'
+    
+    export default function Page() {
+      return <div>{CONSTANT}</div>
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Building
+
+The package must be built before use:
+
+```bash
+cd packages/constants
+pnpm build
+```
+
+Or use watch mode during development:
+
+```bash
+pnpm dev
+```
+
+### Adding New Constants
+
+<Steps>
+  <Step title="Edit constants.ts">
+    ```typescript
+    export const API_URL = 'https://api.nexushotel.com'
+    export const MAX_GUESTS = 10
+    export const BOOKING_STATUSES = ['pending', 'confirmed', 'cancelled'] as const
+    ```
+  </Step>
+  
+  <Step title="Build the Package">
+    ```bash
+    pnpm build
+    ```
+  </Step>
+  
+  <Step title="Import in Apps">
+    ```typescript
+    import { API_URL, MAX_GUESTS, BOOKING_STATUSES } from '@repo/constants'
+    ```
+  </Step>
+</Steps>
+
+## @repo/eslint-config
+
+Shared ESLint configurations for consistent code quality.
+
+**Location:** `packages/eslint-config/`
+
+### Package Configuration
+
+```json packages/eslint-config/package.json
+{
+  "name": "@repo/eslint-config",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    "./base": "./base.js",
+    "./next-js": "./next.js",
+    "./react-internal": "./react-internal.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@next/eslint-plugin-next": "^15.4.2",
+    "eslint": "^9.31.0",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-only-warn": "^1.1.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-turbo": "^2.5.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.37.0"
+  }
+}
+```
+
+### Available Configurations
+
+<Tabs>
+  <Tab title="Base Config">
+    **File:** `packages/eslint-config/base.js`
+    
+    Base ESLint configuration for all packages.
+    
+    **Usage in package.json or eslint.config.js:**
+    ```javascript
+    import baseConfig from '@repo/eslint-config/base'
+    
+    export default [...baseConfig]
+    ```
+  </Tab>
+  
+  <Tab title="Next.js Config">
+    **File:** `packages/eslint-config/next.js`
+    
+    ESLint configuration optimized for Next.js applications.
+    
+    **Usage:**
+    ```javascript
+    import nextConfig from '@repo/eslint-config/next-js'
+    
+    export default [...nextConfig]
+    ```
+  </Tab>
+  
+  <Tab title="React Internal">
+    **File:** `packages/eslint-config/react-internal.js`
+    
+    Configuration for internal React packages.
+    
+    **Usage:**
+    ```javascript
+    import reactConfig from '@repo/eslint-config/react-internal'
+    
+    export default [...reactConfig]
+    ```
+  </Tab>
+</Tabs>
+
+### Features
+
+<CardGroup cols={2}>
+  <Card title="TypeScript Support" icon="code">
+    Full TypeScript linting with typescript-eslint
+  </Card>
+  <Card title="React Rules" icon="react">
+    React and React Hooks linting
+  </Card>
+  <Card title="Next.js Rules" icon="triangle">
+    Next.js-specific linting rules
+  </Card>
+  <Card title="Prettier Compatible" icon="paintbrush">
+    Works with Prettier formatting
+  </Card>
+  <Card title="Only Warnings" icon="exclamation-triangle">
+    Uses only-warn plugin for better DX
+  </Card>
+  <Card title="Turbo Plugin" icon="bolt">
+    Turborepo-specific linting
+  </Card>
+</CardGroup>
+
+## @repo/typescript-config
+
+Shared TypeScript configurations.
+
+**Location:** `packages/typescript-config/`
+
+### Package Configuration
+
+```json packages/typescript-config/package.json
+{
+  "name": "@repo/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
+```
+
+### Available Configurations
+
+```
+packages/typescript-config/
+├── base.json            # Base TypeScript config
+├── nextjs.json          # Next.js TypeScript config
+└── react-library.json   # React library config
+```
+
+<Tabs>
+  <Tab title="Base Config">
+    **File:** `packages/typescript-config/base.json`
+    
+    Base configuration for all TypeScript projects.
+    
+    **Usage in tsconfig.json:**
+    ```json
+    {
+      "extends": "@repo/typescript-config/base.json",
+      "compilerOptions": {
+        "outDir": "./dist"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Next.js Config">
+    **File:** `packages/typescript-config/nextjs.json`
+    
+    Configuration optimized for Next.js applications.
+    
+    **Usage:**
+    ```json
+    {
+      "extends": "@repo/typescript-config/nextjs.json",
+      "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="React Library Config">
+    **File:** `packages/typescript-config/react-library.json`
+    
+    Configuration for React component libraries.
+    
+    **Usage:**
+    ```json
+    {
+      "extends": "@repo/typescript-config/react-library.json",
+      "compilerOptions": {
+        "jsx": "react-jsx"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Package Usage Matrix
+
+| Package | Used By | Purpose |
+|---------|---------|----------|
+| @repo/ui | apps/web | UI components |
+| @repo/constants | apps/api | Shared constants |
+| @repo/eslint-config | All packages | Linting |
+| @repo/typescript-config | All packages | TypeScript compilation |
+
+## Development Workflow
+
+### Installing Shared Packages
+
+Add a shared package to an app:
+
+```bash
+cd apps/web
+pnpm add @repo/ui
+```
+
+Or manually in `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@repo/ui": "workspace:*"
+  }
+}
+```
+
+### Building Packages
+
+Build all packages:
+
+```bash
+pnpm build
+```
+
+Build specific package:
+
+```bash
+cd packages/constants
+pnpm build
+```
+
+### Watch Mode
+
+For active development:
+
+```bash
+cd packages/constants
+pnpm dev
+```
+
+Changes are automatically recompiled.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Workspace Protocol" icon="link">
+    Always use `workspace:*` for internal dependencies
+  </Card>
+  <Card title="Build Before Use" icon="hammer">
+    Build packages before importing them in apps
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Export proper TypeScript types from shared packages
+  </Card>
+  <Card title="Minimal Dependencies" icon="minimize">
+    Keep shared packages lightweight
+  </Card>
+</CardGroup>
+
+## Adding a New Shared Package
+
+<Steps>
+  <Step title="Create Package Directory">
+    ```bash
+    mkdir -p packages/new-package/src
+    cd packages/new-package
+    ```
+  </Step>
+  
+  <Step title="Create package.json">
+    ```json
+    {
+      "name": "@repo/new-package",
+      "version": "0.0.0",
+      "private": true,
+      "main": "./src/index.ts",
+      "types": "./src/index.ts",
+      "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Create Source Files">
+    ```bash
+    echo 'export const MY_CONSTANT = "value"' > src/index.ts
+    ```
+  </Step>
+  
+  <Step title="Add TypeScript Config">
+    ```json tsconfig.json
+    {
+      "extends": "@repo/typescript-config/base.json",
+      "compilerOptions": {
+        "outDir": "./dist"
+      },
+      "include": ["src"]
+    }
+    ```
+  </Step>
+  
+  <Step title="Build and Use">
+    ```bash
+    pnpm build
+    
+    # In another package
+    pnpm add @repo/new-package
+    ```
+  </Step>
+</Steps>
+
+## Package Dependencies
+
+Shared packages can depend on each other:
+
+```json packages/ui/package.json
+{
+  "dependencies": {
+    "@repo/constants": "workspace:*"
+  }
+}
+```
+
+Turborepo handles the build order automatically.
+
+## Related Documentation
+
+<CardGroup cols={3}>
+  <Card title="Monorepo" icon="folder-tree" href="/app/monorepo">
+    Turborepo structure
+  </Card>
+  <Card title="Frontend" icon="react" href="/app/frontend">
+    Next.js application
+  </Card>
+  <Card title="API" icon="server" href="/app/api">
+    Hono.js API service
+  </Card>
+</CardGroup>

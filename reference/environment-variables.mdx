@@ -1,0 +1,287 @@
+---
+title: Environment Variables
+description: Complete environment variable reference for Nexus Hotel platform
+---
+
+## Overview
+
+Nexus Hotel uses environment variables for configuration across different deployment targets including Docker, Kubernetes, and Vercel.
+
+## Local Development Variables
+
+These variables are defined in `.env.example` and should be configured in your local `.env` file.
+
+### Application Variables
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `PORT` | number | No | `3001` | Port for local development server |
+| `DATABASE_URL` | string | Yes | - | Database connection string |
+| `API_KEY` | string | Yes | - | API authentication key |
+
+## Docker Environment Variables
+
+### Production Container (Dockerfile)
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `NODE_ENV` | string | `production` | Node.js environment mode |
+| `PORT` | string | `3000` | Application port |
+| `HOST` | string | `0.0.0.0` | Host binding address |
+
+### Development Container (Dockerfile.dev)
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `NODE_ENV` | string | `development` | Node.js environment mode |
+| `PORT` | string | `3001` | Application port |
+| `HOST` | string | `0.0.0.0` | Host binding address |
+
+### Docker Compose Variables
+
+Defined in `compose.yaml`:
+
+```yaml
+environment:
+  - NODE_ENV=production
+  - PORT=3000
+  - HOST=0.0.0.0
+```
+
+## Kubernetes Environment Variables
+
+Configured in Helm `values.yaml` and injected into pods:
+
+| Variable | Type | Default | Source | Description |
+|----------|------|---------|--------|-------------|
+| `NODE_ENV` | string | `production` | `values.yaml` | Node.js environment |
+| `PORT` | string | `"3000"` | `values.yaml` | Container port |
+
+### Setting in Helm
+
+```bash
+helm upgrade --install nexushotel ./helm \
+  --set env.NODE_ENV=production \
+  --set env.PORT=3000
+```
+
+### Helm Values Configuration
+
+```yaml
+env:
+  NODE_ENV: production
+  PORT: "3000"
+```
+
+## Vercel Environment Variables
+
+Managed by Terraform and synchronized across all Vercel environments (production, preview, development).
+
+### Web Project Variables
+
+Set via Terraform for `hotel-project-web`:
+
+| Variable | Type | Sensitive | Description |
+|----------|------|-----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | string | No | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | string | Yes | Supabase anonymous key |
+
+### API Project Variables
+
+Set via Terraform for `hotel-project-api`:
+
+| Variable | Type | Sensitive | Description |
+|----------|------|-----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | string | No | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | string | Yes | Supabase anonymous key |
+
+### Terraform Configuration
+
+```hcl
+resource "vercel_project_environment_variable" "web_url" {
+  project_id = vercel_project.web.id
+  team_id    = var.vercel_team_id
+  key        = "NEXT_PUBLIC_SUPABASE_URL"
+  value      = var.supabase_url
+  target     = ["production", "preview", "development"]
+}
+
+resource "vercel_project_environment_variable" "web_key" {
+  project_id = vercel_project.web.id
+  team_id    = var.vercel_team_id
+  key        = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  value      = var.supabase_anon_key
+  target     = ["production", "preview", "development"]
+}
+```
+
+## Supabase Variables
+
+### Required Supabase Credentials
+
+<ParamField path="NEXT_PUBLIC_SUPABASE_URL" type="string" required>
+  Your Supabase project URL
+  
+  **Format:** `https://<project-id>.supabase.co`  
+  **Location:** Supabase Dashboard → Project Settings → API → Project URL
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_SUPABASE_ANON_KEY" type="string" required>
+  Your Supabase anonymous public key
+  
+  **Location:** Supabase Dashboard → Project Settings → API → `anon` `public` key  
+  **Note:** This key is safe to use in browsers as it's protected by Row Level Security
+</ParamField>
+
+### Obtaining Supabase Credentials
+
+1. Navigate to your [Supabase Dashboard](https://app.supabase.com)
+2. Select your project
+3. Go to **Settings** → **API**
+4. Copy the **Project URL** (use for `NEXT_PUBLIC_SUPABASE_URL`)
+5. Copy the **anon public** key (use for `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+
+## Build-Time vs Runtime Variables
+
+### Build-Time Variables
+
+Variables prefixed with `NEXT_PUBLIC_` are embedded at build time:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+<Warning>
+  Build-time variables are publicly accessible in the browser bundle. Never use them for sensitive server-side secrets.
+</Warning>
+
+### Runtime Variables
+
+Server-side only variables (no `NEXT_PUBLIC_` prefix):
+
+- `NODE_ENV`
+- `DATABASE_URL`
+- `API_KEY`
+
+## Setting Environment Variables
+
+### Local Development
+
+Create `.env.local` file:
+
+```bash
+# .env.local
+PORT=3001
+DATABASE_URL=postgresql://user:password@localhost:5432/nexushotel
+API_KEY=your-api-key-here
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### Docker
+
+Pass via `--env-file` flag:
+
+```bash
+docker run -p 3000:3000 --env-file .env nexushotel
+```
+
+Or use individual `-e` flags:
+
+```bash
+docker run -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e PORT=3000 \
+  nexushotel
+```
+
+### Kubernetes/Helm
+
+Option 1: Helm values:
+
+```bash
+helm upgrade --install nexushotel ./helm \
+  --set env.NODE_ENV=production
+```
+
+Option 2: Kubernetes ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexushotel-config
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+```
+
+Option 3: Kubernetes Secret (for sensitive data):
+
+```bash
+kubectl create secret generic nexushotel-secrets \
+  --from-literal=DATABASE_URL=postgresql://... \
+  --from-literal=API_KEY=your-key \
+  -n nexushotel
+```
+
+### Vercel
+
+Managed automatically via Terraform. To update:
+
+```bash
+cd terraform
+terraform apply \
+  -var="supabase_url=https://new-project.supabase.co" \
+  -var="supabase_anon_key=new-key"
+```
+
+## Variable Priority
+
+Next.js loads environment variables in the following order (highest priority first):
+
+1. `.env.local` (not committed to Git)
+2. `.env.development` or `.env.production` (based on NODE_ENV)
+3. `.env`
+
+## Security Best Practices
+
+<Warning>
+  Never commit `.env`, `.env.local`, or files containing real credentials to Git
+</Warning>
+
+<Check>
+  Use `.env.example` as a template with placeholder values
+</Check>
+
+<Check>
+  Store production secrets in secure secret management systems
+</Check>
+
+<Check>
+  Rotate API keys and tokens regularly
+</Check>
+
+<Warning>
+  Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser
+</Warning>
+
+## Validation
+
+Validate that required environment variables are set:
+
+```bash
+# Check if variables are loaded in container
+docker exec nexusweb env | grep NODE_ENV
+
+# Check Kubernetes pod environment
+kubectl exec -n nexushotel <pod-name> -- env | grep NODE_ENV
+
+# Verify Vercel environment variables
+vercel env ls
+```
+
+## Related Documentation
+
+- [Docker Reference](/reference/docker-reference)
+- [Helm Values](/reference/helm-values)
+- [Terraform Variables](/reference/terraform-variables)
